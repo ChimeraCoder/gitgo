@@ -1,7 +1,6 @@
 package gitgo
 
 import (
-	"log"
 	"reflect"
 	"strings"
 	"testing"
@@ -51,15 +50,5 @@ First commit. Create .gitignore`
 
 	if !reflect.DeepEqual(expected, result) {
 		t.Errorf("Expected and result don't match:\n%+v\n%+v", expected, result)
-
-		numFields := reflect.ValueOf(expected).NumField()
-		for i := 0; i < numFields; i++ {
-			if !reflect.DeepEqual(reflect.ValueOf(expected).Field(i), reflect.ValueOf(result).Field(i)) {
-				log.Printf("Different value for %s", reflect.TypeOf(expected).Field(i).Name)
-				log.Printf("Different value for %s", reflect.TypeOf(expected).Field(i))
-			}
-		}
-
 	}
-	log.Print(reflect.DeepEqual(expected.Parents, result.Parents))
 }
