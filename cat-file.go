@@ -2,8 +2,7 @@ package gitgo
 
 import (
 	"compress/zlib"
-	"crypto/sha1"
-	"encoding/hex"
+
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,22 +12,7 @@ import (
 
 type KeyType string
 
-type SHA [sha1.Size]byte
-
-// NewSha is a convenience function that
-// converts a hex string representation of a SHA
-// to a SHA type.
-// Its behavior is undefined when given an invalid
-// hex string
-func NewSha(str string) (sha [sha1.Size]byte) {
-
-	bts, _ := hex.DecodeString(str)
-
-	for i := 0; i < len(bts); i++ {
-		sha[i] = bts[i]
-	}
-	return
-}
+type SHA string
 
 const (
 	TreeKey      KeyType = "tree"
@@ -48,17 +32,17 @@ type GitObject struct {
 	Size      string
 }
 
-func NewObject(inputSha string) (obj GitObject, err error) {
-	str, err := CatFile(inputSha)
+func NewObject(input SHA) (obj GitObject, err error) {
+	str, err := CatFile(input)
 	if err != nil {
 		return
 	}
 	return parseObj(str)
 }
 
-func CatFile(inputSha string) (result string, err error) {
+func CatFile(input SHA) (result string, err error) {
 
-	filename := path.Join(".git", "objects", inputSha[:2], inputSha[2:])
+	filename := path.Join(".git", "objects", string(input[:2]), string(input[2:]))
 
 	f, err := os.Open(filename)
 	if err != nil {
