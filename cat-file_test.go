@@ -1,6 +1,7 @@
 package gitgo
 
 import (
+	"crypto/sha1"
 	"reflect"
 	"strings"
 	"testing"
@@ -76,6 +77,16 @@ func Test_parseObj(t *testing.T) {
 		return
 	}
 
+	if !reflect.DeepEqual(expected, result) {
+		t.Errorf("Expected and result don't match:\n%+v\n%+v", expected, result)
+	}
+}
+
+func Test_NewSha(t *testing.T) {
+	input := "af064923bbf2301596aac4c273ba32178ebc4a96"
+	expected := [sha1.Size]byte{175, 6, 73, 35, 187, 242, 48, 21, 150, 170, 196, 194, 115, 186, 50, 23, 142, 188, 74, 150}
+
+	result := NewSha(input)
 	if !reflect.DeepEqual(expected, result) {
 		t.Errorf("Expected and result don't match:\n%+v\n%+v", expected, result)
 	}

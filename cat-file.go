@@ -2,6 +2,8 @@ package gitgo
 
 import (
 	"compress/zlib"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,6 +12,23 @@ import (
 )
 
 type KeyType string
+
+type SHA [sha1.Size]byte
+
+// NewSha is a convenience function that
+// converts a hex string representation of a SHA
+// to a SHA type.
+// Its behavior is undefined when given an invalid
+// hex string
+func NewSha(str string) (sha [sha1.Size]byte) {
+
+	bts, _ := hex.DecodeString(str)
+
+	for i := 0; i < len(bts); i++ {
+		sha[i] = bts[i]
+	}
+	return
+}
 
 const (
 	TreeKey      KeyType = "tree"
