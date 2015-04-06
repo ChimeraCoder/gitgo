@@ -29,6 +29,14 @@ type GitObject struct {
 	Size      string
 }
 
+func NewObject(inputSha string) (obj GitObject, err error) {
+	str, err := CatFile(inputSha)
+	if err != nil {
+		return
+	}
+	return parseObj(str)
+}
+
 func CatFile(inputSha string) (result string, err error) {
 
 	filename := path.Join(".git", "objects", inputSha[:2], inputSha[2:])
