@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 )
 
@@ -42,6 +41,14 @@ func NewObject(input SHA) (obj GitObject, err error) {
 	return parseObj(str)
 }
 
+func normalizePerms(perms string) string {
+	// TODO don't store permissions as a string
+	for len(perms) < 6 {
+		perms = "0" + perms
+	}
+	return perms
+}
+
 func parseObj(obj string) (result GitObject, err error) {
 
 	parts := strings.Split(obj, "\x00")
@@ -52,7 +59,6 @@ func parseObj(obj string) (result GitObject, err error) {
 
 	lines := strings.Split(obj[nullIndex+1:], "\n")
 
-	log.Printf("obj %s", obj)
 	switch result.Type {
 	case "commit":
 		for i, line := range lines {
@@ -78,12 +84,11 @@ func parseObj(obj string) (result GitObject, err error) {
 			}
 		}
 	case "tree":
-		log.Printf("obj is %q", obj)
 
 		scanner := bufio.NewScanner(bytes.NewBuffer([]byte(obj)))
 		scanner.Split(ScanNullLines)
 
-		var result treePart
+		var tmp treePart
 
 		var resultObjs []treePart
 
@@ -94,7 +99,6 @@ func parseObj(obj string) (result GitObject, err error) {
 			}
 
 			txt := scanner.Text()
-			log.Printf("Text is %q", txt)
 
 			if count == 0 {
 				// the first time through, scanner.Text() will be
@@ -106,8 +110,8 @@ func parseObj(obj string) (result GitObject, err error) {
 				// <perms> <filename>
 				// separated by a space
 				fields := strings.Fields(txt)
-				result.Perms = fields[0]
-				result.filename = fields[1]
+				tmp.Perms = normalizePerms(fields[0])
+				tmp.filename = fields[1]
 				continue
 			}
 
@@ -119,76 +123,39 @@ func parseObj(obj string) (result GitObject, err error) {
 			// then scanner.Text() will yield exactly 20 bytes.
 
 			// decode the next 20 bytes to get the SHA
-			result.Hash = SHA(hex.EncodeToString([]byte(txt[:20])))
-			resultObjs = append(resultObjs, result)
+			tmp.Hash = SHA(hex.EncodeToString([]byte(txt[:20])))
+			resultObjs = append(resultObjs, tmp)
 			if len(txt) <= 20 {
 				// We've read the last line
 				break
 			}
 
 			// Now, result points to the next object in the tree listing
-			result = treePart{}
+			tmp = treePart{}
 			remainder := txt[20:]
 			fields := strings.Fields(remainder)
-			result.Perms = fields[0]
-			result.filename = fields[1]
+			tmp.Perms = normalizePerms(fields[0])
+			tmp.filename = fields[1]
 		}
 
 		if err := scanner.Err(); err != nil && err != io.EOF {
 			return GitObject{}, err
 		}
 
-		log.Printf("Result objects are %+v", resultObjs)
-		/*
-			items := obj
-
-			// Items come in the form
-			// A FNS
-			// http://stackoverflow.com/questions/17910016/unzip-git-tree-object
-
-			log.Printf("Items is %q", items)
-			permsEnd := strings.Index(items, " ")
-			perms := items[:permsEnd]
-			log.Printf("perms are %q", perms)
-			filenameEnd := strings.Index(items, "\x00")
-			filename := items[permsEnd+1 : filenameEnd]
-
-			log.Printf("filename is %s", filename)
-
-			// the sha will be exactly 20 bytes
-			shaBts := []byte(items[filenameEnd+1 : filenameEnd+1+20])
-			sha := SHA(hex.EncodeToString(shaBts))
-			log.Printf("Sha is %q", sha)
-		*/
-
-		/*
-			for _, line := range lines {
-				fields := strings.Fields(line)
-				perms := fields[0]
-				_type := fields[1]
-				hash := SHA(fields[2])
-				filename := fields[3]
-
-				log.Printf(" line is %s", line)
-				switch _type {
-				case "blob":
-					result.Blobs = append(result.Blobs, struct {
-						Hash     SHA
-						Perms    string
-						filename string
-					}{hash, perms, filename})
-				case "tree":
-					result.Trees = append(result.Trees, struct {
-						Hash     SHA
-						Perms    string
-						filename string
-					}{hash, perms, filename})
-				default:
-					err = fmt.Errorf("Encountered unknown type in tree: %s", _type)
-					return
-				}
+		for _, part := range resultObjs {
+			obj, err := NewObject(part.Hash)
+			if err != nil {
+				return GitObject{}, err
 			}
-		*/
+			switch obj.Type {
+			case "tree":
+				result.Trees = append(result.Trees, part)
+			case "blob":
+				result.Blobs = append(result.Blobs, part)
+			default:
+				return GitObject{}, fmt.Errorf("Unknown type found: %s", obj.Type)
+			}
+		}
 	}
 
 	return
