@@ -80,3 +80,27 @@ func Test_parseObj(t *testing.T) {
 		t.Errorf("Expected and result don't match:\n%+v\n%+v", expected, result)
 	}
 }
+
+func Test_ParseTree(t *testing.T) {
+	const inputSha = SHA("1efecd717188441397c07f267cf468fdf04d4796")
+	expected := GitObject{
+		Type: "tree",
+		Size: "156",
+		Blobs: []treePart{
+			treePart{SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67"), "100644", ".gitignore"},
+			treePart{SHA("f45d37d9add8f21eb84678f6d2c66377c4dd0c5e"), "100644", "cat-file.go"},
+			treePart{SHA("2c225b962d6666011c69ca5c2c67204959f8ba32"), "100644", "cat-file_test.go"},
+		},
+		Trees: []treePart{
+			treePart{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
+		},
+	}
+	result, err := NewObject(inputSha)
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(expected, result) {
+		t.Errorf("Expected and result don't match:\n\n%+v\n\n%+v", expected, result)
+	}
+
+}
