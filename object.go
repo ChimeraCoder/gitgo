@@ -9,7 +9,11 @@ import (
 	"strings"
 )
 
-type GitObject struct {
+type GitObject interface {
+	Type() string
+}
+
+type gitObject struct {
 	Type string
 
 	// Commit fields
@@ -26,6 +30,42 @@ type GitObject struct {
 
 	// Blob
 	Contents string
+}
+
+type Blob struct {
+	_type    string
+	size     string
+	Contents string
+}
+
+func (b Blob) Type() string {
+	return b._type
+
+}
+
+type Commit struct {
+	_type     string
+	Tree      string
+	Parents   []string
+	Author    string
+	Committer string
+	Message   string
+	size      string
+}
+
+func (c Commit) Type() string {
+	return c._type
+}
+
+type Tree struct {
+	_type string
+	Blobs []objectMeta
+	Trees []objectMeta
+	size  string
+}
+
+func (t Tree) Type() string {
+	return t._type
 }
 
 // objectMeta contains the metadata
@@ -57,37 +97,40 @@ func parseObj(obj string) (result GitObject, err error) {
 
 	parts := strings.Split(obj, "\x00")
 	parts = strings.Fields(parts[0])
-	result.Type = parts[0]
-	result.Size = parts[1]
+	resultType := parts[0]
+	resultSize := parts[1]
 	nullIndex := strings.Index(obj, "\x00")
 
 	lines := strings.Split(obj[nullIndex+1:], "\n")
 
-	switch result.Type {
+	switch resultType {
 	case "commit":
+		var commit = Commit{_type: resultType, size: resultSize}
 		for i, line := range lines {
 			// The next line is the commit message
 			if len(strings.Fields(line)) == 0 {
-				result.Message = strings.Join(lines[i+1:], "\n")
+				commit.Message = strings.Join(lines[i+1:], "\n")
 				break
 			}
 			parts := strings.Fields(line)
 			key := parts[0]
 			switch KeyType(key) {
 			case TreeKey:
-				result.Tree = parts[1]
+				commit.Tree = parts[1]
 			case ParentKey:
-				result.Parents = append(result.Parents, parts[1])
+				commit.Parents = append(commit.Parents, parts[1])
 			case AuthorKey:
-				result.Author = strings.Join(parts[1:], " ")
+				commit.Author = strings.Join(parts[1:], " ")
 			case CommitterKey:
-				result.Committer = strings.Join(parts[1:], " ")
+				commit.Committer = strings.Join(parts[1:], " ")
 			default:
 				err = fmt.Errorf("Encounterd unknown field in commit: %s", key)
 				return
 			}
 		}
+		result = commit
 	case "tree":
+		var tree = Tree{_type: resultType, size: resultSize}
 
 		scanner := bufio.NewScanner(bytes.NewBuffer([]byte(obj)))
 		scanner.Split(ScanNullLines)
@@ -134,7 +177,7 @@ func parseObj(obj string) (result GitObject, err error) {
 				break
 			}
 
-			// Now, result points to the next object in the tree listing
+			// Now, tmp points to the next object in the tree listing
 			tmp = objectMeta{}
 			remainder := txt[20:]
 			fields := strings.Fields(remainder)
@@ -143,27 +186,30 @@ func parseObj(obj string) (result GitObject, err error) {
 		}
 
 		if err := scanner.Err(); err != nil && err != io.EOF {
-			return GitObject{}, err
+			return tree, err
 		}
 
 		for _, part := range resultObjs {
 			obj, err := NewObject(part.Hash)
 			if err != nil {
-				return GitObject{}, err
+				return tree, err
 			}
-			switch obj.Type {
+			switch obj.Type() {
 			case "tree":
-				result.Trees = append(result.Trees, part)
+				tree.Trees = append(tree.Trees, part)
 			case "blob":
-				result.Blobs = append(result.Blobs, part)
+				tree.Blobs = append(tree.Blobs, part)
 			default:
-				return GitObject{}, fmt.Errorf("Unknown type found: %s", obj.Type)
+				return tree, fmt.Errorf("Unknown type found: %s", obj.Type)
 			}
 		}
+		result = tree
 	case "blob":
-		result.Contents = obj[nullIndex+1:]
+		var blob = Blob{_type: resultType, size: resultSize}
+		blob.Contents = obj[nullIndex+1:]
+		result = blob
 	default:
-		err = fmt.Errorf("Received unknown object type %s", result.Type)
+		err = fmt.Errorf("Received unknown object type %s", resultType)
 	}
 
 	return

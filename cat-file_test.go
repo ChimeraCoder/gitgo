@@ -1,7 +1,6 @@
 package gitgo
 
 import (
-	"log"
 	"reflect"
 	"strings"
 	"testing"
@@ -27,14 +26,14 @@ First commit. Create .gitignore`
 }
 
 func Test_parseObjInitialCommit(t *testing.T) {
-	expected := GitObject{
-		Type:      "commit",
+	expected := Commit{
+		_type:     "commit",
 		Tree:      "9de6c72106b169990a83ce7090c7cad84b6b506b",
 		Parents:   nil,
 		Author:    "aditya <dev@chimeracoder.net> 1428075900 -0400",
 		Committer: "aditya <dev@chimeracoder.net> 1428075900 -0400",
 		Message:   "First commit. Create .gitignore",
-		Size:      "190",
+		size:      "190",
 	}
 
 	const input = "commit 190\x00" + `tree 9de6c72106b169990a83ce7090c7cad84b6b506b
@@ -56,14 +55,14 @@ First commit. Create .gitignore`
 func Test_parseObj(t *testing.T) {
 	const inputSha = SHA("3ead3116d0378089f5ce61086354aac43e736b01")
 
-	expected := GitObject{
-		Type:      "commit",
+	expected := Commit{
+		_type:     "commit",
 		Tree:      "d22fc8a57073fdecae2001d00aff921440d3aabd",
 		Parents:   []string{"1d833eb5b6c5369c0cb7a4a3e20ded237490145f"},
 		Author:    "aditya <dev@chimeracoder.net> 1428349896 -0400",
 		Committer: "aditya <dev@chimeracoder.net> 1428349896 -0400",
 		Message:   "Remove extraneous logging statements\n",
-		Size:      "243",
+		size:      "243",
 	}
 
 	str, err := CatFile(inputSha)
@@ -84,9 +83,9 @@ func Test_parseObj(t *testing.T) {
 
 func Test_ParseTree(t *testing.T) {
 	const inputSha = SHA("1efecd717188441397c07f267cf468fdf04d4796")
-	expected := GitObject{
-		Type: "tree",
-		Size: "156",
+	expected := Tree{
+		_type: "tree",
+		size:  "156",
 		Blobs: []objectMeta{
 			objectMeta{SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67"), "100644", ".gitignore"},
 			objectMeta{SHA("f45d37d9add8f21eb84678f6d2c66377c4dd0c5e"), "100644", "cat-file.go"},
@@ -108,9 +107,9 @@ func Test_ParseTree(t *testing.T) {
 
 func Test_ParseBlob(t *testing.T) {
 	const inputSha = SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67")
-	expected := GitObject{
-		Type:     "blob",
-		Size:     "18",
+	expected := Blob{
+		_type:    "blob",
+		size:     "18",
 		Contents: "*.swp\n*.swo\n*.swn\n",
 	}
 	result, err := NewObject(inputSha)
@@ -119,8 +118,6 @@ func Test_ParseBlob(t *testing.T) {
 	}
 	if !reflect.DeepEqual(expected, result) {
 		t.Errorf("Expected and result don't match:\n\n%+v\n\n%+v", expected, result)
-		log.Printf("%q", expected.Contents)
-		log.Printf("%q", result.Contents)
 	}
 
 }
