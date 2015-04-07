@@ -21,13 +21,14 @@ type GitObject struct {
 	Size      string
 
 	// Tree blob
-	Blobs []treePart
-	Trees []treePart
+	Blobs []objectMeta
+	Trees []objectMeta
 }
 
-// a treePart contains the hash, permissions, and filename
+// objectMeta contains the metadata
+// (hash, permissions, and filename)
 // corresponding either to a blob (leaf) or another tree
-type treePart struct {
+type objectMeta struct {
 	Hash     SHA
 	Perms    string
 	filename string
@@ -88,9 +89,9 @@ func parseObj(obj string) (result GitObject, err error) {
 		scanner := bufio.NewScanner(bytes.NewBuffer([]byte(obj)))
 		scanner.Split(ScanNullLines)
 
-		var tmp treePart
+		var tmp objectMeta
 
-		var resultObjs []treePart
+		var resultObjs []objectMeta
 
 		for count := 0; ; count++ {
 			done := !scanner.Scan()
@@ -131,7 +132,7 @@ func parseObj(obj string) (result GitObject, err error) {
 			}
 
 			// Now, result points to the next object in the tree listing
-			tmp = treePart{}
+			tmp = objectMeta{}
 			remainder := txt[20:]
 			fields := strings.Fields(remainder)
 			tmp.Perms = normalizePerms(fields[0])

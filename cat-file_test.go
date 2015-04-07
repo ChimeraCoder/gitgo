@@ -86,13 +86,13 @@ func Test_ParseTree(t *testing.T) {
 	expected := GitObject{
 		Type: "tree",
 		Size: "156",
-		Blobs: []treePart{
-			treePart{SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67"), "100644", ".gitignore"},
-			treePart{SHA("f45d37d9add8f21eb84678f6d2c66377c4dd0c5e"), "100644", "cat-file.go"},
-			treePart{SHA("2c225b962d6666011c69ca5c2c67204959f8ba32"), "100644", "cat-file_test.go"},
+		Blobs: []objectMeta{
+			objectMeta{SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67"), "100644", ".gitignore"},
+			objectMeta{SHA("f45d37d9add8f21eb84678f6d2c66377c4dd0c5e"), "100644", "cat-file.go"},
+			objectMeta{SHA("2c225b962d6666011c69ca5c2c67204959f8ba32"), "100644", "cat-file_test.go"},
 		},
-		Trees: []treePart{
-			treePart{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
+		Trees: []objectMeta{
+			objectMeta{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
 		},
 	}
 	result, err := NewObject(inputSha)
