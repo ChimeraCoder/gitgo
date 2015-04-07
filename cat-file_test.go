@@ -1,6 +1,7 @@
 package gitgo
 
 import (
+	"log"
 	"reflect"
 	"strings"
 	"testing"
@@ -101,6 +102,25 @@ func Test_ParseTree(t *testing.T) {
 	}
 	if !reflect.DeepEqual(expected, result) {
 		t.Errorf("Expected and result don't match:\n\n%+v\n\n%+v", expected, result)
+	}
+
+}
+
+func Test_ParseBlob(t *testing.T) {
+	const inputSha = SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67")
+	expected := GitObject{
+		Type:     "blob",
+		Size:     "18",
+		Contents: "*.swp\n*.swo\n*.swn\n",
+	}
+	result, err := NewObject(inputSha)
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(expected, result) {
+		t.Errorf("Expected and result don't match:\n\n%+v\n\n%+v", expected, result)
+		log.Printf("%q", expected.Contents)
+		log.Printf("%q", result.Contents)
 	}
 
 }

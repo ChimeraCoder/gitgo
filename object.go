@@ -20,9 +20,12 @@ type GitObject struct {
 	Message   string
 	Size      string
 
-	// Tree blob
+	// Tree
 	Blobs []objectMeta
 	Trees []objectMeta
+
+	// Blob
+	Contents string
 }
 
 // objectMeta contains the metadata
@@ -157,6 +160,10 @@ func parseObj(obj string) (result GitObject, err error) {
 				return GitObject{}, fmt.Errorf("Unknown type found: %s", obj.Type)
 			}
 		}
+	case "blob":
+		result.Contents = obj[nullIndex+1:]
+	default:
+		err = fmt.Errorf("Received unknown object type %s", result.Type)
 	}
 
 	return
