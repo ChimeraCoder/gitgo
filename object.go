@@ -200,7 +200,7 @@ func parseObj(obj string) (result GitObject, err error) {
 			case "blob":
 				tree.Blobs = append(tree.Blobs, part)
 			default:
-				return tree, fmt.Errorf("Unknown type found: %s", obj.Type)
+				return tree, fmt.Errorf("Unknown type found: %s", obj.Type())
 			}
 		}
 		result = tree
