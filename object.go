@@ -124,7 +124,7 @@ func parseObj(obj string) (result GitObject, err error) {
 			case CommitterKey:
 				commit.Committer = strings.Join(parts[1:], " ")
 			default:
-				err = fmt.Errorf("Encounterd unknown field in commit: %s", key)
+				err = fmt.Errorf("Encountered unknown field in commit: %s", key)
 				return
 			}
 		}
