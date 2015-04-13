@@ -1,17 +1,27 @@
 package gitgo
 
 import (
-	"compress/zlib"
-
-	"io/ioutil"
-	"os"
+	"fmt"
 	"path"
+	"path/filepath"
 )
 
-func getIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
-	files, _ := path.filepath.Glob(path.Join(idxFilePath, "*.idx"))
-	return files[0]
+func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
+	files, err := filepath.Glob(path.Join(dotGitRootPath, "objects/pack", "*.idx"))
+	idxFilePath = files[0]
+	return
 }
+
+func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
+	files, err := filepath.Glob(path.Join(dotGitRootPath, "objects/pack", "*.idx"))
+	idxFilePath = files[0]
+	return
+}
+
+// func main() {
+// 	// fmt.Println("i got...")
+// 	fmt.Println(getIdxPath("test_data/dot_git"))
+// }
 
 // type KeyType string
 // type SHA string
