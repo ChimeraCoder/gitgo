@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 )
 
@@ -78,11 +79,11 @@ type objectMeta struct {
 }
 
 func NewObject(input SHA) (obj GitObject, err error) {
-	str, err := CatFile(input)
+	r, err := readObjectFile(input)
 	if err != nil {
 		return
 	}
-	return parseObj(str)
+	return parseObj(r)
 }
 
 func normalizePerms(perms string) string {
@@ -93,7 +94,12 @@ func normalizePerms(perms string) string {
 	return perms
 }
 
-func parseObj(obj string) (result GitObject, err error) {
+func parseObj(r io.Reader) (result GitObject, err error) {
+	bts, err := ioutil.ReadAll(r)
+	if err != nil {
+		return result, err
+	}
+	obj := string(bts)
 
 	parts := strings.Split(obj, "\x00")
 	parts = strings.Fields(parts[0])

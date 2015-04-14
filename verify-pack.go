@@ -4,7 +4,6 @@ package gitgo
 
 import (
 	"compress/zlib"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"

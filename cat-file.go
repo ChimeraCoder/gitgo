@@ -3,7 +3,7 @@ package gitgo
 import (
 	"compress/zlib"
 
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 )
@@ -19,7 +19,9 @@ const (
 	CommitterKey         = "committer"
 )
 
-func CatFile(input SHA) (result string, err error) {
+// readObjectFile returns an io.Reader that reads the object file
+// corresponding to the given SHA
+func readObjectFile(input SHA) (result io.Reader, err error) {
 
 	filename := path.Join(".git", "objects", string(input[:2]), string(input[2:]))
 
@@ -29,15 +31,5 @@ func CatFile(input SHA) (result string, err error) {
 	}
 	defer f.Close()
 
-	r, err := zlib.NewReader(f)
-	if err != nil {
-		return
-	}
-
-	bts, err := ioutil.ReadAll(r)
-	if err != nil {
-		return
-	}
-
-	return string(bts), nil
+	return zlib.NewReader(f)
 }

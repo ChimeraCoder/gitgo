@@ -1,23 +1,34 @@
 package gitgo
 
 import (
+	"io"
+	"io/ioutil"
 	"reflect"
 	"strings"
 	"testing"
 )
 
-func Test_CatFile(t *testing.T) {
+func ReadAll(t *testing.T, r io.Reader) []byte {
+	bts, err := ioutil.ReadAll(r)
+	if err != nil {
+		t.Error(err)
+	}
+	return bts
+}
+
+func Test_readObjectFile(t *testing.T) {
 	const inputSha = SHA("97eed02ebe122df8fdd853c1215d8775f3d9f1a1")
 	const expected = "commit 190\x00" + `tree 9de6c72106b169990a83ce7090c7cad84b6b506b
 author aditya <dev@chimeracoder.net> 1428075900 -0400
 committer aditya <dev@chimeracoder.net> 1428075900 -0400
 
 First commit. Create .gitignore`
-	result, err := CatFile(inputSha)
+	r, err := readObjectFile(inputSha)
 	if err != nil {
 		t.Error(err)
 		return
 	}
+	result := string(ReadAll(t, r))
 
 	if strings.Trim(result, "\n\r") != strings.Trim(expected, "\n\r") {
 
@@ -41,7 +52,7 @@ author aditya <dev@chimeracoder.net> 1428075900 -0400
 committer aditya <dev@chimeracoder.net> 1428075900 -0400
 
 First commit. Create .gitignore`
-	result, err := parseObj(input)
+	result, err := parseObj(strings.NewReader(input))
 	if err != nil {
 		t.Error(err)
 		return
@@ -65,12 +76,12 @@ func Test_parseObj(t *testing.T) {
 		size:      "243",
 	}
 
-	str, err := CatFile(inputSha)
+	r, err := readObjectFile(inputSha)
 	if err != nil {
 		t.Error(err)
 	}
 
-	result, err := parseObj(str)
+	result, err := parseObj(r)
 	if err != nil {
 		t.Error(err)
 		return
