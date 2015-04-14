@@ -130,7 +130,7 @@ func parseObj(r io.Reader) (result GitObject, err error) {
 			case CommitterKey:
 				commit.Committer = strings.Join(parts[1:], " ")
 			default:
-				err = fmt.Errorf("Encountered unknown field in commit: %s", key)
+				err = fmt.Errorf("encountered unknown field in commit: %s", key)
 				return
 			}
 		}
