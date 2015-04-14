@@ -1,5 +1,6 @@
-// package gitgo
-package main
+package gitgo
+
+// package main
 
 import (
 	"compress/zlib"
@@ -36,12 +37,12 @@ func VerifyPack(idxFilePath string) (verifyPackResult string, err error) {
 	return string(bts), nil
 }
 
-func main() {
-	path, _ := GetIdxPath("test_data/dot_git")
-	fmt.Println("idx path is: ")
-	fmt.Println(path)
-
-	fmt.Println("Content is: ")
-	idxFileContent, _ := VerifyPack(path)
-	fmt.Println(idxFileContent)
-}
+// func main() {
+// 	path, _ := GetIdxPath("test_data/dot_git")
+// 	fmt.Println("idx path is: ")
+// 	fmt.Println(path)
+//
+// 	fmt.Println("Content is: ")
+// 	idxFileContent, _ := VerifyPack(path)
+// 	fmt.Println(idxFileContent)
+// }
