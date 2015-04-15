@@ -2,9 +2,11 @@ package gitgo
 
 import (
 	"bufio"
+	"bytes"
 	"compress/zlib"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"path"
 	"path/filepath"
@@ -28,12 +30,14 @@ func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
 
 func VerifyPack(pack io.Reader, idx io.Reader) error {
 	versionChan := make(chan int)
-	err := parsePack(pack, versionChan)
-	if err != nil {
-		return err
-	}
+	go func() {
+		err := parsePack(pack, versionChan)
+		if err != nil {
+			log.Print("error parsing packfile: %s", err)
+		}
+	}()
 
-	go parseIdx(idx, versionChan)
+	err := parseIdx(idx, versionChan)
 	return err
 }
 
@@ -74,15 +78,40 @@ func parsePack(pack io.Reader, versionChan chan<- int) (err error) {
 	return nil
 }
 
+func Clone(r io.Reader) (*bufio.Reader, *bufio.Reader) {
+	var b1 bytes.Buffer
+	var b2 bytes.Buffer
+	w := io.MultiWriter(&b1, &b2)
+	io.Copy(w, r)
+	return bufio.NewReader(&b1), bufio.NewReader(&b2)
+}
+
+func bytesToNum(b []byte) uint {
+	var n uint
+	for i := 0; i < len(b); i++ {
+		n = n | (uint(b[len(b)-i-1]) << uint(i*8))
+	}
+	return n
+}
+
 // parsePackV2 parses a packfile that uses
 // version 2 of the format
 func parsePackV2(pack io.Reader) error {
+
+	pack, backupPack := Clone(pack)
+
+	// index stores the index of the "current" read position (ignoring any buffered data)
+	// indexed from the very initial reader
+	// at any point, cloning the original reader and reading (index) bytes will yield
+	// a pseudo-resetted reader
+	var index int
 	r := bufio.NewReader(pack)
 	numObjectsBts := make([]byte, 4)
-	_, err := r.Read(numObjectsBts)
+	n, err := r.Read(numObjectsBts)
 	if err != nil {
 		return err
 	}
+	index += n
 
 	var numObjects uint32
 	for i := 0; i < len(numObjectsBts); i++ {
@@ -94,6 +123,7 @@ func parsePackV2(pack io.Reader) error {
 		if err != nil {
 			return err
 		}
+		index++
 
 		// This will extract the last three bits of
 		// the first nibble in the byte
@@ -131,6 +161,7 @@ func parsePackV2(pack io.Reader) error {
 					return err
 				}
 				MSB = (_byte & 128)
+				index++
 
 				objectSize += int((uint(_byte) & 127) << shift)
 				shift += 7
@@ -149,10 +180,30 @@ func parsePackV2(pack io.Reader) error {
 			if err != nil {
 				return err
 			}
+			zr.Close()
+
 			if n != objectSize {
 				return fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
 			}
-			log.Printf("read %+v", object)
+			log.Printf("read %+v", string(object))
+
+			var b bytes.Buffer
+			w := zlib.NewWriter(&b)
+			if err != nil {
+				return err
+			}
+			// written tells us how many bytes to advance in the original input
+			written, err := w.Write(object)
+			if err != nil {
+				return err
+			}
+			log.Printf("written %d", written)
+
+			r, backupPack = Clone(backupPack)
+
+			for i := 0; i < written; i++ {
+				r.ReadByte()
+			}
 
 		case objectType == OBJ_OFS_DELTA:
 			// read the n-byte offset
@@ -214,6 +265,27 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 	for i, row := range fanoutTable {
 		log.Printf("row %d: %+v", i, row)
 	}
+
+	numObjects := int(bytesToNum(fanoutTable[len(fanoutTable)-1]))
+
+	objectNames := make([]SHA, numObjects)
+
+	for i := 0; i < numObjects; i++ {
+		sha := make([]byte, 20)
+		n, err = idx.Read(sha)
+		if err != nil {
+			return err
+		}
+		log.Printf("% x", sha[:n])
+
+		objectNames[i] = SHA(fmt.Sprintf("%x", sha[:n]))
+	}
+
+	bts, err := ioutil.ReadAll(idx)
+	if err != nil {
+		return err
+	}
+	log.Printf("Remainder:\n% x", bts)
 
 	return nil
 }
