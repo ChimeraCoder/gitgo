@@ -6,7 +6,6 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"path"
 	"path/filepath"
@@ -276,16 +275,53 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 		if err != nil {
 			return err
 		}
-		log.Printf("% x", sha[:n])
+		log.Printf("%x", sha[:n])
 
 		objectNames[i] = SHA(fmt.Sprintf("%x", sha[:n]))
 	}
 
-	bts, err := ioutil.ReadAll(idx)
+	// Then come 4-byte CRC32 values
+	crc32Table := make([]byte, numObjects*4)
+	_, err = idx.Read(crc32Table)
 	if err != nil {
 		return err
 	}
-	log.Printf("Remainder:\n% x", bts)
+
+	// Next come 4-byte offset values
+	// If the MSB is set, there is an index into the next table
+	// otherwise, these are 31 bits each
+	offsetsFlat := make([]byte, numObjects*4)
+	_, err = idx.Read(offsetsFlat)
+	if err != nil {
+		return err
+	}
+
+	offsets := make([][]byte, numObjects)
+	for i := 0; i < len(offsets); i++ {
+		offsets[i] = offsetsFlat[i*4 : (i+1)*4]
+		log.Printf("% x", offsets[i])
+	}
+
+	// If the pack file is more than 2 GB, there will be a table of 8-byte offset entries here
+	// TODO implement this
+
+	// This is the same as the checksum at the end of the corresponding packfile
+	packfileChecksum := make([]byte, 20)
+	_, err = idx.Read(packfileChecksum)
+	if err != nil {
+		return
+	}
+
+	// This is the checksum of all of the above data
+	// We're not checking it now, but if we can't read it properly
+	// that means an error has occurred earlier in parsing
+	idxChecksum := make([]byte, 20)
+	_, err = idx.Read(idxChecksum)
+	if err != nil {
+		return
+	}
+
+	// TODO check that there isn't any data left
 
 	return nil
 }
