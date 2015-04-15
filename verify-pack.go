@@ -12,6 +12,11 @@ import (
 	"reflect"
 )
 
+type packObject struct {
+	Name   SHA
+	Offset int
+}
+
 const (
 	OBJ_COMMIT    uint8 = 1
 	OBJ_TREE            = 2
@@ -29,35 +34,29 @@ func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
 
 func VerifyPack(pack io.Reader, idx io.Reader) error {
 	versionChan := make(chan int)
-	go func() {
-		err := parsePack(pack, versionChan)
-		if err != nil {
-			log.Print("error parsing packfile: %s", err)
-		}
-	}()
 
-	err := parseIdx(idx, versionChan)
+	_, err := parsePack(pack, idx, versionChan)
 	return err
 }
 
-func parsePack(pack io.Reader, versionChan chan<- int) (err error) {
+func parsePack(pack io.Reader, idx io.Reader, versionChan chan<- int) (objects []packObject, err error) {
 	signature := make([]byte, 4)
 	n, err := pack.Read(signature)
 	if err == nil && n != 4 {
-		return fmt.Errorf("expected to read 4 bytes, read %d", n)
+		return nil, fmt.Errorf("expected to read 4 bytes, read %d", n)
 	}
 	if string(signature) != "PACK" {
-		return fmt.Errorf("Received invalid signature: %s", string(signature))
+		return nil, fmt.Errorf("Received invalid signature: %s", string(signature))
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Printf("signature %+v", signature)
 
 	version := make([]byte, 4)
 	_, err = pack.Read(version)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// TODO use encoding/binary here
 	log.Printf("version is %+v", version)
@@ -65,16 +64,17 @@ func parsePack(pack io.Reader, versionChan chan<- int) (err error) {
 	switch v {
 	case 2:
 		// Parse version 2 packfile
-		go func() {
-			versionChan <- 2
-		}()
-		return parsePackV2(pack)
+		objects, err = parseIdx(idx, 2)
+		if err != nil {
+			return
+		}
+		return nil, parsePackV2(pack, objects)
 
 	default:
-		return fmt.Errorf("cannot parse packfile with version %d", v)
+		return nil, fmt.Errorf("cannot parse packfile with version %d", v)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func Clone(r io.Reader) (*bufio.Reader, *bufio.Reader) {
@@ -95,22 +95,14 @@ func bytesToNum(b []byte) uint {
 
 // parsePackV2 parses a packfile that uses
 // version 2 of the format
-func parsePackV2(pack io.Reader) error {
+func parsePackV2(pack io.Reader, objects []packObject) error {
 
-	pack, backupPack := Clone(pack)
-
-	// index stores the index of the "current" read position (ignoring any buffered data)
-	// indexed from the very initial reader
-	// at any point, cloning the original reader and reading (index) bytes will yield
-	// a pseudo-resetted reader
-	var index int
 	r := bufio.NewReader(pack)
 	numObjectsBts := make([]byte, 4)
-	n, err := r.Read(numObjectsBts)
+	_, err := r.Read(numObjectsBts)
 	if err != nil {
 		return err
 	}
-	index += n
 
 	var numObjects uint32
 	for i := 0; i < len(numObjectsBts); i++ {
@@ -122,7 +114,6 @@ func parsePackV2(pack io.Reader) error {
 		if err != nil {
 			return err
 		}
-		index++
 
 		// This will extract the last three bits of
 		// the first nibble in the byte
@@ -160,7 +151,6 @@ func parsePackV2(pack io.Reader) error {
 					return err
 				}
 				MSB = (_byte & 128)
-				index++
 
 				objectSize += int((uint(_byte) & 127) << shift)
 				shift += 7
@@ -186,24 +176,6 @@ func parsePackV2(pack io.Reader) error {
 			}
 			log.Printf("read %+v", string(object))
 
-			var b bytes.Buffer
-			w := zlib.NewWriter(&b)
-			if err != nil {
-				return err
-			}
-			// written tells us how many bytes to advance in the original input
-			written, err := w.Write(object)
-			if err != nil {
-				return err
-			}
-			log.Printf("written %d", written)
-
-			r, backupPack = Clone(backupPack)
-
-			for i := 0; i < written; i++ {
-				r.ReadByte()
-			}
-
 		case objectType == OBJ_OFS_DELTA:
 			// read the n-byte offset
 			log.Printf("encountered ofs delta")
@@ -217,10 +189,9 @@ func parsePackV2(pack io.Reader) error {
 	return nil
 }
 
-func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
-	version := <-versionChan
+func parseIdx(idx io.Reader, version int) (objects []packObject, err error) {
 	if version != 2 {
-		return fmt.Errorf("cannot parse IDX with version %d")
+		return nil, fmt.Errorf("cannot parse IDX with version %d")
 	}
 	// parse version 2 idxfile
 
@@ -228,18 +199,18 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 	header := make([]byte, 4)
 	n, err := idx.Read(header)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !reflect.DeepEqual([]byte{255, 116, 79, 99}, header) {
-		return fmt.Errorf("invalid IDX header: %q", string(header))
+		return nil, fmt.Errorf("invalid IDX header: %q", string(header))
 	}
 
 	// Then the version number in four bytes
 	versionBts := make([]byte, 4)
 	_, err = idx.Read(versionBts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// We already know the version, so we can ignore it
 
@@ -251,7 +222,7 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 		err = fmt.Errorf("read incomplete fanout table: %d", n)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Initialize the flat fanout table
@@ -266,6 +237,7 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 	}
 
 	numObjects := int(bytesToNum(fanoutTable[len(fanoutTable)-1]))
+	objects = make([]packObject, numObjects)
 
 	objectNames := make([]SHA, numObjects)
 
@@ -273,18 +245,19 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 		sha := make([]byte, 20)
 		n, err = idx.Read(sha)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		log.Printf("%x", sha[:n])
 
 		objectNames[i] = SHA(fmt.Sprintf("%x", sha[:n]))
+		objects[i].Name = SHA(fmt.Sprintf("%x", sha[:n]))
 	}
 
 	// Then come 4-byte CRC32 values
 	crc32Table := make([]byte, numObjects*4)
 	_, err = idx.Read(crc32Table)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Next come 4-byte offset values
@@ -293,13 +266,18 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 	offsetsFlat := make([]byte, numObjects*4)
 	_, err = idx.Read(offsetsFlat)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	offsets := make([][]byte, numObjects)
+	offsets := make([]int, numObjects)
 	for i := 0; i < len(offsets); i++ {
-		offsets[i] = offsetsFlat[i*4 : (i+1)*4]
-		log.Printf("% x", offsets[i])
+		offset := int(bytesToNum(offsetsFlat[i*4 : (i+1)*4]))
+		// check if the MSB is 1
+		if offset&2147483648 > 0 {
+			return nil, fmt.Errorf("packfile is too large to parse")
+		}
+		offsets[i] = offset
+		objects[i].Offset = offset
 	}
 
 	// If the pack file is more than 2 GB, there will be a table of 8-byte offset entries here
@@ -323,5 +301,5 @@ func parseIdx(idx io.Reader, versionChan <-chan int) (err error) {
 
 	// TODO check that there isn't any data left
 
-	return nil
+	return objects, err
 }
