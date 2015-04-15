@@ -2,4 +2,4 @@ gitgo
 ========
 
 
-Gitgo is a pure implementation of basic git functions.
+Gitgo is a pure Go implementation of basic git functions.
