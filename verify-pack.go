@@ -16,8 +16,8 @@ import (
 type packObject struct {
 	Name   SHA
 	Offset int
-
-	Type uint8
+	Data   []byte
+	Type   uint8
 }
 
 const (
@@ -54,13 +54,17 @@ func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
 }
 
 func VerifyPack(pack io.ReadSeeker, idx io.Reader) error {
-	versionChan := make(chan int)
 
-	_, err := parsePack(errReadSeeker{pack, nil}, idx, versionChan)
+	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
+	for _, object := range objects {
+		if object.Type < 5 {
+			log.Printf("%s", object.Data)
+		}
+	}
 	return err
 }
 
-func parsePack(pack errReadSeeker, idx io.Reader, versionChan chan<- int) (objects []packObject, err error) {
+func parsePack(pack errReadSeeker, idx io.Reader) (objects []*packObject, err error) {
 	signature := make([]byte, 4)
 	pack.read(signature)
 	if string(signature) != "PACK" {
@@ -112,7 +116,7 @@ func bytesToNum(b []byte) uint {
 
 // parsePackV2 parses a packfile that uses
 // version 2 of the format
-func parsePackV2(r errReadSeeker, objects []packObject) ([]packObject, error) {
+func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) {
 
 	numObjectsBts := make([]byte, 4)
 	r.read(numObjectsBts)
@@ -120,11 +124,8 @@ func parsePackV2(r errReadSeeker, objects []packObject) ([]packObject, error) {
 		return nil, fmt.Errorf("Expected %d objects and found %d", len(objects), numObjectsBts)
 	}
 
-	// At this point, we have read 16 bytes from the reader
-	// so all of our offsets will be off by 16
-
 	for _, object := range objects {
-		//r.Seek(int64(object.Offset) + 16, os.SEEK_SET)
+		r.Seek(int64(object.Offset), os.SEEK_SET)
 		r.Seek(0, os.SEEK_CUR)
 		_bytes := make([]byte, 1)
 		r.read(_bytes)
@@ -174,13 +175,13 @@ func parsePackV2(r errReadSeeker, objects []packObject) ([]packObject, error) {
 			// (objectSize) is the size, in bytes, of this object *when expanded*
 			// the IDX file tells us how many *compressed* bytes the object will take
 			// (in other words, how much space to allocate for the result)
-			object := make([]byte, objectSize)
+			object.Data = make([]byte, objectSize)
 
 			zr, err := zlib.NewReader(r.r)
 			if err != nil {
 				return nil, err
 			}
-			n, err := zr.Read(object)
+			n, err := zr.Read(object.Data)
 			if err != nil {
 				if err == io.EOF {
 					err = nil
@@ -193,7 +194,6 @@ func parsePackV2(r errReadSeeker, objects []packObject) ([]packObject, error) {
 			if n != objectSize {
 				return nil, fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
 			}
-			log.Printf("read %+v", string(object))
 
 		case object.Type == OBJ_OFS_DELTA:
 			// read the n-byte offset
@@ -208,7 +208,7 @@ func parsePackV2(r errReadSeeker, objects []packObject) ([]packObject, error) {
 	return objects, nil
 }
 
-func parseIdx(idx io.Reader, version int) (objects []packObject, err error) {
+func parseIdx(idx io.Reader, version int) (objects []*packObject, err error) {
 	if version != 2 {
 		return nil, fmt.Errorf("cannot parse IDX with version %d")
 	}
@@ -256,7 +256,7 @@ func parseIdx(idx io.Reader, version int) (objects []packObject, err error) {
 	}
 
 	numObjects := int(bytesToNum(fanoutTable[len(fanoutTable)-1]))
-	objects = make([]packObject, numObjects)
+	objects = make([]*packObject, numObjects)
 
 	objectNames := make([]SHA, numObjects)
 
@@ -269,7 +269,7 @@ func parseIdx(idx io.Reader, version int) (objects []packObject, err error) {
 		log.Printf("%x", sha[:n])
 
 		objectNames[i] = SHA(fmt.Sprintf("%x", sha[:n]))
-		objects[i].Name = SHA(fmt.Sprintf("%x", sha[:n]))
+		objects[i] = &packObject{Name: SHA(fmt.Sprintf("%x", sha[:n]))}
 	}
 
 	// Then come 4-byte CRC32 values
