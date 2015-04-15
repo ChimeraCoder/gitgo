@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -15,6 +16,8 @@ import (
 type packObject struct {
 	Name   SHA
 	Offset int
+
+	Type uint8
 }
 
 const (
@@ -26,25 +29,40 @@ const (
 	OBJ_REF_DELTA       = 7
 )
 
+type errReadSeeker struct {
+	r   io.ReadSeeker
+	err error
+}
+
+// Read, but only if no errors have been encountered
+// in a previous read (including io.EOF)
+func (er *errReadSeeker) read(buf []byte) {
+	if er.err != nil {
+		return
+	}
+	_, er.err = er.r.Read(buf)
+}
+
+func (er *errReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	return er.r.Seek(offset, whence)
+}
+
 func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
 	files, err := filepath.Glob(path.Join(dotGitRootPath, "objects/pack", "*.idx"))
 	idxFilePath = files[0]
 	return
 }
 
-func VerifyPack(pack io.Reader, idx io.Reader) error {
+func VerifyPack(pack io.ReadSeeker, idx io.Reader) error {
 	versionChan := make(chan int)
 
-	_, err := parsePack(pack, idx, versionChan)
+	_, err := parsePack(errReadSeeker{pack, nil}, idx, versionChan)
 	return err
 }
 
-func parsePack(pack io.Reader, idx io.Reader, versionChan chan<- int) (objects []packObject, err error) {
+func parsePack(pack errReadSeeker, idx io.Reader, versionChan chan<- int) (objects []packObject, err error) {
 	signature := make([]byte, 4)
-	n, err := pack.Read(signature)
-	if err == nil && n != 4 {
-		return nil, fmt.Errorf("expected to read 4 bytes, read %d", n)
-	}
+	pack.read(signature)
 	if string(signature) != "PACK" {
 		return nil, fmt.Errorf("Received invalid signature: %s", string(signature))
 	}
@@ -54,10 +72,8 @@ func parsePack(pack io.Reader, idx io.Reader, versionChan chan<- int) (objects [
 	log.Printf("signature %+v", signature)
 
 	version := make([]byte, 4)
-	_, err = pack.Read(version)
-	if err != nil {
-		return nil, err
-	}
+	pack.read(version)
+
 	// TODO use encoding/binary here
 	log.Printf("version is %+v", version)
 	v := version[3]
@@ -68,7 +84,8 @@ func parsePack(pack io.Reader, idx io.Reader, versionChan chan<- int) (objects [
 		if err != nil {
 			return
 		}
-		return nil, parsePackV2(pack, objects)
+		objects, err = parsePackV2(pack, objects)
+		return
 
 	default:
 		return nil, fmt.Errorf("cannot parse packfile with version %d", v)
@@ -95,37 +112,35 @@ func bytesToNum(b []byte) uint {
 
 // parsePackV2 parses a packfile that uses
 // version 2 of the format
-func parsePackV2(pack io.Reader, objects []packObject) error {
+func parsePackV2(r errReadSeeker, objects []packObject) ([]packObject, error) {
 
-	r := bufio.NewReader(pack)
 	numObjectsBts := make([]byte, 4)
-	_, err := r.Read(numObjectsBts)
-	if err != nil {
-		return err
+	r.read(numObjectsBts)
+	if int(bytesToNum(numObjectsBts)) != len(objects) {
+		return nil, fmt.Errorf("Expected %d objects and found %d", len(objects), numObjectsBts)
 	}
 
-	var numObjects uint32
-	for i := 0; i < len(numObjectsBts); i++ {
-		numObjects = numObjects | (uint32(numObjectsBts[len(numObjectsBts)-i-1]) << uint(i*8))
-	}
+	// At this point, we have read 16 bytes from the reader
+	// so all of our offsets will be off by 16
 
-	for i := 0; i < int(numObjects); i++ {
-		_byte, err := r.ReadByte()
-		if err != nil {
-			return err
-		}
+	for _, object := range objects {
+		//r.Seek(int64(object.Offset) + 16, os.SEEK_SET)
+		r.Seek(0, os.SEEK_CUR)
+		_bytes := make([]byte, 1)
+		r.read(_bytes)
+		_byte := _bytes[0]
 
 		// This will extract the last three bits of
 		// the first nibble in the byte
 		// which tells us the object type
-		objectType := ((_byte >> 4) & 7)
-		if objectType < 5 {
+		object.Type = ((_byte >> 4) & 7)
+		if object.Type < 5 {
 			// the object is a commit, tree, blob, or tag
 		}
 		switch {
-		case objectType < 5:
+		case object.Type < 5:
 			// the object is a commit, tree, blob, or tag
-			log.Printf("Object type %d", objectType)
+			log.Printf("Object type %d", object.Type)
 
 			// determine the (decompressed) object size
 			// and then deflate the following bytes
@@ -146,10 +161,10 @@ func parsePackV2(pack io.Reader, objects []packObject) error {
 			// for the object size
 			for MSB > 0 {
 				// Keep reading the size until the MSB is 0
-				_byte, err = r.ReadByte()
-				if err != nil {
-					return err
-				}
+				_bytes := make([]byte, 1)
+				r.read(_bytes)
+				_byte := _bytes[0]
+
 				MSB = (_byte & 128)
 
 				objectSize += int((uint(_byte) & 127) << shift)
@@ -161,32 +176,36 @@ func parsePackV2(pack io.Reader, objects []packObject) error {
 			// (in other words, how much space to allocate for the result)
 			object := make([]byte, objectSize)
 
-			zr, err := zlib.NewReader(r)
+			zr, err := zlib.NewReader(r.r)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			n, err := zr.Read(object)
 			if err != nil {
-				return err
+				if err == io.EOF {
+					err = nil
+				} else {
+					return nil, err
+				}
 			}
 			zr.Close()
 
 			if n != objectSize {
-				return fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
+				return nil, fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
 			}
 			log.Printf("read %+v", string(object))
 
-		case objectType == OBJ_OFS_DELTA:
+		case object.Type == OBJ_OFS_DELTA:
 			// read the n-byte offset
 			log.Printf("encountered ofs delta")
 
-		case objectType == OBJ_REF_DELTA:
+		case object.Type == OBJ_REF_DELTA:
 			// Read the 20-byte base object name
 			log.Printf("encountered ref delta")
 		}
 	}
 
-	return nil
+	return objects, nil
 }
 
 func parseIdx(idx io.Reader, version int) (objects []packObject, err error) {
