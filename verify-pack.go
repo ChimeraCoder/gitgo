@@ -11,6 +11,15 @@ import (
 	"reflect"
 )
 
+const (
+	OBJ_COMMIT    uint8 = 1
+	OBJ_TREE            = 2
+	OBJ_BLOB            = 3
+	OBJ_TAG             = 4
+	OBJ_OFS_DELTA       = 6
+	OBJ_REF_DELTA       = 7
+)
+
 func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
 	files, err := filepath.Glob(path.Join(dotGitRootPath, "objects/pack", "*.idx"))
 	idxFilePath = files[0]
@@ -65,15 +74,8 @@ func parsePack(pack io.Reader, versionChan chan<- int) (err error) {
 	return nil
 }
 
-const (
-	OBJ_COMMIT    uint8 = 1
-	OBJ_TREE            = 2
-	OBJ_BLOB            = 3
-	OBJ_TAG             = 4
-	OBJ_OFS_DELTA       = 6
-	OBJ_REF_DELTA       = 7
-)
-
+// parsePackV2 parses a packfile that uses
+// version 2 of the format
 func parsePackV2(pack io.Reader) error {
 	r := bufio.NewReader(pack)
 	numObjectsBts := make([]byte, 4)
@@ -93,54 +95,73 @@ func parsePackV2(pack io.Reader) error {
 			return err
 		}
 
-		// The most-significant byte (MSB)
-		// tells us whether we need to read more bytes
-		// to get the encoded object size
-		MSB := (_byte & 128) // will be either 128 or 0
-
 		// This will extract the last three bits of
 		// the first nibble in the byte
 		// which tells us the object type
-		_ = ((_byte >> 4) & 7)
+		objectType := ((_byte >> 4) & 7)
+		if objectType < 5 {
+			// the object is a commit, tree, blob, or tag
+		}
+		switch {
+		case objectType < 5:
+			// the object is a commit, tree, blob, or tag
+			log.Printf("Object type %d", objectType)
 
-		// This will extract the last four bits of the byte
-		var objectSize int = int((uint(_byte) & 15))
+			// determine the (decompressed) object size
+			// and then deflate the following bytes
 
-		// shift the first size by 0
-		// and the rest by 4 + (i-1) * 7
-		var shift uint = 4
+			// The most-significant byte (MSB)
+			// tells us whether we need to read more bytes
+			// to get the encoded object size
+			MSB := (_byte & 128) // will be either 128 or 0
 
-		// If the most-significant bit is 0, this is the last byte
-		// for the object size
-		for MSB > 0 {
-			// Keep reading the size until the MSB is 0
-			_byte, err = r.ReadByte()
+			// This will extract the last four bits of the byte
+			var objectSize int = int((uint(_byte) & 15))
+
+			// shift the first size by 0
+			// and the rest by 4 + (i-1) * 7
+			var shift uint = 4
+
+			// If the most-significant bit is 0, this is the last byte
+			// for the object size
+			for MSB > 0 {
+				// Keep reading the size until the MSB is 0
+				_byte, err = r.ReadByte()
+				if err != nil {
+					return err
+				}
+				MSB = (_byte & 128)
+
+				objectSize += int((uint(_byte) & 127) << shift)
+				shift += 7
+			}
+
+			// (objectSize) is the size, in bytes, of this object *when expanded*
+			// the IDX file tells us how many *compressed* bytes the object will take
+			// (in other words, how much space to allocate for the result)
+			object := make([]byte, objectSize)
+
+			zr, err := zlib.NewReader(r)
 			if err != nil {
 				return err
 			}
-			MSB = (_byte & 128)
+			n, err := zr.Read(object)
+			if err != nil {
+				return err
+			}
+			if n != objectSize {
+				return fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
+			}
+			log.Printf("read %+v", object)
 
-			objectSize += int((uint(_byte) & 127) << shift)
-			shift += 7
-		}
+		case objectType == OBJ_OFS_DELTA:
+			// read the n-byte offset
+			log.Printf("encountered ofs delta")
 
-		// (objectSize) is the size, in bytes, of this object *when expanded*
-		// the IDX file tells us how many *compressed* bytes the object will take
-		// (in other words, how much space to allocate for the result)
-		object := make([]byte, objectSize)
-
-		zr, err := zlib.NewReader(r)
-		if err != nil {
-			return err
+		case objectType == OBJ_REF_DELTA:
+			// Read the 20-byte base object name
+			log.Printf("encountered ref delta")
 		}
-		n, err := zr.Read(object)
-		if err != nil {
-			return err
-		}
-		if n != objectSize {
-			return fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
-		}
-		log.Printf("read %+v", object)
 	}
 
 	return nil
