@@ -17,16 +17,20 @@ type packObject struct {
 	Name   SHA
 	Offset int
 	Data   []byte
-	Type   uint8
+	Type   packObjectType
 }
 
+//go:generate stringer -type=packObjectType
+type packObjectType uint8
+
 const (
-	OBJ_COMMIT    uint8 = 1
-	OBJ_TREE            = 2
-	OBJ_BLOB            = 3
-	OBJ_TAG             = 4
-	OBJ_OFS_DELTA       = 6
-	OBJ_REF_DELTA       = 7
+	_ packObjectType = iota
+	OBJ_COMMIT
+	OBJ_TREE
+	OBJ_BLOB
+	OBJ_TAG
+	OBJ_OFS_DELTA
+	OBJ_REF_DELTA
 )
 
 type errReadSeeker struct {
@@ -58,7 +62,7 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) error {
 	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
 	for _, object := range objects {
 		if object.Type < 5 {
-			log.Printf("%s", object.Data)
+			log.Printf("%s %s", object.Name, object.Type)
 		}
 	}
 	return err
@@ -134,7 +138,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 		// This will extract the last three bits of
 		// the first nibble in the byte
 		// which tells us the object type
-		object.Type = ((_byte >> 4) & 7)
+		object.Type = packObjectType(((_byte >> 4) & 7))
 		if object.Type < 5 {
 			// the object is a commit, tree, blob, or tag
 		}
@@ -197,15 +201,42 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 
 		case object.Type == OBJ_OFS_DELTA:
 			// read the n-byte offset
+			// from the git docs:
+			// "n bytes with MSB set in all but the last one.
+			// The offset is then the number constructed by
+			// concatenating the lower 7 bit of each byte, and
+			// for n >= 2 adding 2^7 + 2^14 + ... + 2^(7*(n-1))
+			// to the result."
+
 			log.Printf("encountered ofs delta")
+
+			var offset int
+			MSB := (_byte & 128) // will be either 128 or 0
+			var shift uint = 0
+			for MSB > 0 {
+				// Keep reading the size until the MSB is 0
+				_bytes := make([]byte, 1)
+				r.read(_bytes)
+				_byte := _bytes[0]
+
+				MSB = (_byte & 128)
+
+				offset += int((uint(_byte) & 127) << shift)
+				shift += 7
+			}
 
 		case object.Type == OBJ_REF_DELTA:
 			// Read the 20-byte base object name
 			log.Printf("encountered ref delta")
+			baseObjName := make([]byte, 20)
+			r.read(baseObjName)
+			fmt.Printf("Obj name %x\n", baseObjName)
+			fmt.Printf("err %+v", r.err)
+
 		}
 	}
 
-	return objects, nil
+	return objects, r.err
 }
 
 func parseIdx(idx io.Reader, version int) (objects []*packObject, err error) {
