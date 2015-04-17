@@ -18,6 +18,8 @@ type packObject struct {
 	Offset int
 	Data   []byte
 	Type   packObjectType
+
+	err error // was an error encountered while processing this object?
 }
 
 //go:generate stringer -type=packObjectType
@@ -61,9 +63,13 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) error {
 
 	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
 	for _, object := range objects {
-		if object.Type < 5 {
-			log.Printf("%s %s", object.Name, object.Type)
+		if object.err == nil {
+			log.Printf("Found %s %s", object.Name, object.Type)
+		} else {
+
+			log.Printf("Found %s %s %s", object.Name, object.Type, object.err)
 		}
+
 	}
 	return err
 }
@@ -139,42 +145,39 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 		// the first nibble in the byte
 		// which tells us the object type
 		object.Type = packObjectType(((_byte >> 4) & 7))
-		if object.Type < 5 {
-			// the object is a commit, tree, blob, or tag
+
+		// determine the (decompressed) object size
+		// and then deflate the following bytes
+
+		// The most-significant byte (MSB)
+		// tells us whether we need to read more bytes
+		// to get the encoded object size
+		MSB := (_byte & 128) // will be either 128 or 0
+
+		// This will extract the last four bits of the byte
+		var objectSize int = int((uint(_byte) & 15))
+
+		// shift the first size by 0
+		// and the rest by 4 + (i-1) * 7
+		var shift uint = 4
+
+		// If the most-significant bit is 0, this is the last byte
+		// for the object size
+		for MSB > 0 {
+			// Keep reading the size until the MSB is 0
+			_bytes := make([]byte, 1)
+			r.read(_bytes)
+			_byte := _bytes[0]
+
+			MSB = (_byte & 128)
+
+			objectSize += int((uint(_byte) & 127) << shift)
+			shift += 7
 		}
+
 		switch {
 		case object.Type < 5:
 			// the object is a commit, tree, blob, or tag
-			log.Printf("Object type %d", object.Type)
-
-			// determine the (decompressed) object size
-			// and then deflate the following bytes
-
-			// The most-significant byte (MSB)
-			// tells us whether we need to read more bytes
-			// to get the encoded object size
-			MSB := (_byte & 128) // will be either 128 or 0
-
-			// This will extract the last four bits of the byte
-			var objectSize int = int((uint(_byte) & 15))
-
-			// shift the first size by 0
-			// and the rest by 4 + (i-1) * 7
-			var shift uint = 4
-
-			// If the most-significant bit is 0, this is the last byte
-			// for the object size
-			for MSB > 0 {
-				// Keep reading the size until the MSB is 0
-				_bytes := make([]byte, 1)
-				r.read(_bytes)
-				_byte := _bytes[0]
-
-				MSB = (_byte & 128)
-
-				objectSize += int((uint(_byte) & 127) << shift)
-				shift += 7
-			}
 
 			// (objectSize) is the size, in bytes, of this object *when expanded*
 			// the IDX file tells us how many *compressed* bytes the object will take
@@ -229,10 +232,22 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			// Read the 20-byte base object name
 			log.Printf("encountered ref delta")
 			baseObjName := make([]byte, 20)
+
 			r.read(baseObjName)
 			fmt.Printf("Obj name %x\n", baseObjName)
-			fmt.Printf("err %+v", r.err)
+			fmt.Printf("size %d\n", objectSize)
 
+			zr, err := zlib.NewReader(r.r)
+			if err != nil {
+				object.err = err
+				continue
+			}
+			_, err = zr.Read(object.Data)
+			if err != nil && err != io.EOF {
+				object.err = err
+				continue
+			}
+			zr.Close()
 		}
 	}
 
@@ -282,15 +297,12 @@ func parseIdx(idx io.Reader, version int) (objects []*packObject, err error) {
 		fanoutTable[(i+1)/4] = entry
 	}
 
-	for i, row := range fanoutTable {
-		log.Printf("row %d: %+v", i, row)
-	}
-
 	numObjects := int(bytesToNum(fanoutTable[len(fanoutTable)-1]))
 	objects = make([]*packObject, numObjects)
 
 	objectNames := make([]SHA, numObjects)
 
+	log.Print("Object names from IDX:")
 	for i := 0; i < numObjects; i++ {
 		sha := make([]byte, 20)
 		n, err = idx.Read(sha)
