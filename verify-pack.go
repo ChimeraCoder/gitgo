@@ -75,7 +75,7 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 			log.Printf("Found %s (%d)  %s", object.Name, object.size, object.Type)
 		} else {
 
-			log.Printf("Found %s %s (%d) %s", object.Name, object.Type, object.size, object.err)
+			log.Printf("Found %s (%d) %s %s", object.Name, object.size, object.Type, object.err)
 		}
 
 	}
@@ -237,6 +237,23 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				shift += 7
 			}
 			object.negativeOffset = offset
+			object.Data = make([]byte, objectSize)
+
+			zr, err := zlib.NewReader(r.r)
+			if err != nil {
+				log.Printf("Shift is %d", shift)
+				log.Printf("Object size is %d", objectSize)
+				object.err = err
+				continue
+			}
+			n, err := zr.Read(object.Data)
+			if err != nil && err != io.EOF {
+				object.err = err
+				continue
+			}
+			object.Data = object.Data[:n]
+			zr.Close()
+			log.Printf("Ofs data is %q", object.Data)
 
 		case object.Type == OBJ_REF_DELTA:
 			r.Seek(int64(object.Offset), os.SEEK_SET)
