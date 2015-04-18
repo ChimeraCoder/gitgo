@@ -31,6 +31,7 @@ const (
 	OBJ_TREE
 	OBJ_BLOB
 	OBJ_TAG
+	_
 	OBJ_OFS_DELTA
 	OBJ_REF_DELTA
 )
