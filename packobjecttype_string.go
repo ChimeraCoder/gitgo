@@ -4,14 +4,25 @@ package gitgo
 
 import "fmt"
 
-const _packObjectType_name = "OBJ_COMMITOBJ_TREEOBJ_BLOBOBJ_TAGOBJ_OFS_DELTAOBJ_REF_DELTA"
+const (
+	_packObjectType_name_0 = "OBJ_COMMITOBJ_TREEOBJ_BLOBOBJ_TAG"
+	_packObjectType_name_1 = "OBJ_OFS_DELTAOBJ_REF_DELTA"
+)
 
-var _packObjectType_index = [...]uint8{0, 10, 18, 26, 33, 46, 59}
+var (
+	_packObjectType_index_0 = [...]uint8{0, 10, 18, 26, 33}
+	_packObjectType_index_1 = [...]uint8{0, 13, 26}
+)
 
 func (i packObjectType) String() string {
-	i -= 1
-	if i+1 >= packObjectType(len(_packObjectType_index)) {
-		return fmt.Sprintf("packObjectType(%d)", i+1)
+	switch {
+	case 1 <= i && i <= 4:
+		i -= 1
+		return _packObjectType_name_0[_packObjectType_index_0[i]:_packObjectType_index_0[i+1]]
+	case 6 <= i && i <= 7:
+		i -= 6
+		return _packObjectType_name_1[_packObjectType_index_1[i]:_packObjectType_index_1[i+1]]
+	default:
+		return fmt.Sprintf("packObjectType(%d)", i)
 	}
-	return _packObjectType_name[_packObjectType_index[i]:_packObjectType_index[i+1]]
 }
