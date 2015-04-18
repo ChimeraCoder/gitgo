@@ -66,9 +66,23 @@ chain length = 2: 1 object
 	}
 	defer idxFile.Close()
 
-	err = VerifyPack(packFile, idxFile)
+	objectHashes := map[string]struct{}{"3ead3116d0378089f5ce61086354aac43e736b01": struct{}{}, "1d833eb5b6c5369c0cb7a4a3e20ded237490145f": struct{}{}, "a7f92c920ce85f07a33f948aa4fa2548b270024f": struct{}{}, "97eed02ebe122df8fdd853c1215d8775f3d9f1a1": struct{}{}, "d22fc8a57073fdecae2001d00aff921440d3aabd": struct{}{}, "df891299372c34b57e41cfc50a0113e2afac3210": struct{}{}, "af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67": struct{}{}, "6b32b1ac731898894c403f6b621bdda167ab8d7c": struct{}{}, "7147f43ae01c9f04a78d6e80544ed84def06e958": struct{}{}, "05d3cc770bd3524cc25d47e083d8942ad25033f0": struct{}{}, "c3b8133617bbdb72e237b0f163fade7fbf1f0c18": struct{}{}, "8264d7bcc297e15c452a7aef3a2e40934762b7e3": struct{}{}, "254671773e8cd91e07e36546c9a2d9c27e8dfeec": struct{}{}, "ba74813270ff557c4a5d1be0562a141bbee4d3e6": struct{}{}, "b45377f6daf59a4cec9e8de64f5df1533a7994cd": struct{}{}, "9de6c72106b169990a83ce7090c7cad84b6b506b": struct{}{}, "fe89ee30bbcdfdf376beae530cc53f967012f31c": struct{}{}}
+	objects, err := VerifyPack(packFile, idxFile)
 	if err != nil {
 		t.Error(err)
+	}
+
+	if len(objects) != len(objectHashes) {
+		t.Errorf("Read incorrect number of objects: %d, want %d", len(objects), len(objectHashes))
+	}
+
+	for _, object := range objects {
+		if _, ok := objectHashes[string(object.Name)]; !ok {
+			t.Errorf("Encountered incorrect hash %s", object.Name)
+		}
+		if object.err != nil {
+			t.Errorf("Error reading object %s: %s", object.Name, object.err)
+		}
 	}
 
 	/*

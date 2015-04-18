@@ -19,6 +19,11 @@ type packObject struct {
 	Data   []byte
 	Type   packObjectType
 
+	// only used for OBJ_OFS_DELTA
+	negativeOffset int
+
+	size int
+
 	err error // was an error encountered while processing this object?
 }
 
@@ -43,11 +48,13 @@ type errReadSeeker struct {
 
 // Read, but only if no errors have been encountered
 // in a previous read (including io.EOF)
-func (er *errReadSeeker) read(buf []byte) {
+func (er *errReadSeeker) read(buf []byte) int {
+	var n int
 	if er.err != nil {
-		return
+		return 0
 	}
-	_, er.err = er.r.Read(buf)
+	n, er.err = io.ReadFull(er.r, buf)
+	return n
 }
 
 func (er *errReadSeeker) Seek(offset int64, whence int) (int64, error) {
@@ -60,19 +67,19 @@ func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
 	return
 }
 
-func VerifyPack(pack io.ReadSeeker, idx io.Reader) error {
+func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 
 	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
 	for _, object := range objects {
 		if object.err == nil {
-			log.Printf("Found %s %s", object.Name, object.Type)
+			log.Printf("Found %s (%d)  %s", object.Name, object.size, object.Type)
 		} else {
 
-			log.Printf("Found %s %s %s", object.Name, object.Type, object.err)
+			log.Printf("Found %s %s (%d) %s", object.Name, object.Type, object.size, object.err)
 		}
 
 	}
-	return err
+	return objects, err
 }
 
 func parsePack(pack errReadSeeker, idx io.Reader) (objects []*packObject, err error) {
@@ -136,10 +143,10 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 	}
 
 	for _, object := range objects {
+		var btsread int
 		r.Seek(int64(object.Offset), os.SEEK_SET)
-		r.Seek(0, os.SEEK_CUR)
 		_bytes := make([]byte, 1)
-		r.read(_bytes)
+		btsread += r.read(_bytes)
 		_byte := _bytes[0]
 
 		// This will extract the last three bits of
@@ -167,7 +174,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 		for MSB > 0 {
 			// Keep reading the size until the MSB is 0
 			_bytes := make([]byte, 1)
-			r.read(_bytes)
+			btsread += r.read(_bytes)
 			_byte := _bytes[0]
 
 			MSB = (_byte & 128)
@@ -176,6 +183,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			shift += 7
 		}
 
+		object.size = objectSize
 		switch {
 		case object.Type < 5:
 			// the object is a commit, tree, blob, or tag
@@ -228,26 +236,27 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				offset += int((uint(_byte) & 127) << shift)
 				shift += 7
 			}
+			object.negativeOffset = offset
 
 		case object.Type == OBJ_REF_DELTA:
+			r.Seek(int64(object.Offset), os.SEEK_SET)
 			// Read the 20-byte base object name
-			log.Printf("encountered ref delta")
 			baseObjName := make([]byte, 20)
 
 			r.read(baseObjName)
-			fmt.Printf("Obj name %x\n", baseObjName)
-			fmt.Printf("size %d\n", objectSize)
+			object.Data = make([]byte, objectSize)
 
 			zr, err := zlib.NewReader(r.r)
 			if err != nil {
 				object.err = err
 				continue
 			}
-			_, err = zr.Read(object.Data)
+			n, err := zr.Read(object.Data)
 			if err != nil && err != io.EOF {
 				object.err = err
 				continue
 			}
+			object.Data = object.Data[:n]
 			zr.Close()
 		}
 	}
@@ -303,14 +312,12 @@ func parseIdx(idx io.Reader, version int) (objects []*packObject, err error) {
 
 	objectNames := make([]SHA, numObjects)
 
-	log.Print("Object names from IDX:")
 	for i := 0; i < numObjects; i++ {
 		sha := make([]byte, 20)
 		n, err = idx.Read(sha)
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("%x", sha[:n])
 
 		objectNames[i] = SHA(fmt.Sprintf("%x", sha[:n]))
 		objects[i] = &packObject{Name: SHA(fmt.Sprintf("%x", sha[:n]))}
