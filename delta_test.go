@@ -1,6 +1,7 @@
 package gitgo
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"os"
@@ -30,6 +31,29 @@ func Test_Delta(t *testing.T) {
 	restored := Delta(fin, deltaf)
 	if !readersEqual(expectedf, restored) {
 		t.Errorf("delta application failed")
+	}
+}
+
+func Test_parseVarInt(t *testing.T) {
+	type pair struct {
+		b []byte
+		i int
+	}
+	inputs := []pair{
+		pair{[]byte{145, 46}, 5905},
+		pair{[]byte{137, 49}, 6281},
+	}
+	for _, p := range inputs {
+		input := p.b
+		expected := p.i
+		result, err := parseVarInt(bytes.NewBuffer(input))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if result != expected {
+			t.Errorf("Expected %d and received %d", expected, result)
+		}
 	}
 }
 
