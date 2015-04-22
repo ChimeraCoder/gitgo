@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"reflect"
 	"testing"
@@ -28,8 +29,27 @@ func Test_Delta(t *testing.T) {
 		return
 	}
 
-	restored := Delta(fin, deltaf)
-	if !readersEqual(expectedf, restored) {
+	restored, err := Delta(fin, deltaf)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	bts1, err := ioutil.ReadAll(expectedf)
+	if err != nil {
+		t.Error(err)
+	}
+
+	bts2, err := ioutil.ReadAll(restored)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(bts1) != len(bts2) {
+		t.Errorf("Expected %d bytes and received %d", len(bts1), len(bts2))
+	}
+
+	if !reflect.DeepEqual(bts1, bts2) {
 		t.Errorf("delta application failed")
 	}
 }
@@ -67,6 +87,8 @@ func readersEqual(r1, r2 io.Reader) bool {
 	if err != nil {
 		panic(err)
 	}
+	log.Printf("1: %s", bts)
+	log.Printf("2: %s", bts2)
 	if !reflect.DeepEqual(bts, bts2) {
 		return false
 	}
