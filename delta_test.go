@@ -67,7 +67,6 @@ func Test_PatchDelta(t *testing.T) {
 			t.Errorf("delta application failed")
 			continue
 		}
-		log.Printf("SUCCESS")
 	}
 }
 

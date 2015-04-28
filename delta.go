@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 )
 
@@ -15,9 +14,9 @@ func patchDelta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 
 	// First, read the source and target lengths (varints)
 	// we can ignore err as long as we check deltar.err at the end
+	// we have no need for the targetLength right now, so we discard it
 	sourceLength, _ := parseVarInt(deltar)
-	targetLength, _ := parseVarInt(deltar)
-	log.Printf("Expecting target length %d", targetLength)
+	_, _ = parseVarInt(deltar)
 	if deltar.err != nil {
 		return nil, deltar.err
 	}
@@ -37,7 +36,6 @@ func patchDelta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 
 		// b represents our command itself (opcode)
 		b := bs[0]
-		log.Printf("b is %08b", b)
 		switch b & 128 {
 		case 128:
 			// b is a copy instruction
@@ -64,20 +62,17 @@ func patchDelta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 			// if the fifth bit from the right is set, read the next byte
 			// The number of copy bytes must fit into
 
-			var numBytes uint = 0
+			var numBytes uint
 
 			if (b & 16) > 0 {
 				numBytes = numBytes | uint(uint(deltar.readByte(true)))
-				log.Printf("16 %d", numBytes)
 			}
 			if (b & 32) > 0 {
 				numBytes = numBytes | uint((uint(deltar.readByte(true)) << 8))
-				log.Printf("32 %d", numBytes)
 			}
 
 			if (b & 64) > 0 {
 				numBytes = numBytes | uint((uint(deltar.readByte(true)) << 16))
-				log.Printf("64 %d", numBytes)
 			}
 
 			// Default to 0x10000 due to overflow
@@ -85,8 +80,6 @@ func patchDelta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 				numBytes = 65536
 			}
 
-			log.Printf("copy offset %d", baseOffset)
-			log.Printf("copy length %d", numBytes)
 			// read numBytes from source, starting at baseOffset
 			// and write that to the target
 			base.Seek(int64(baseOffset), os.SEEK_SET)
@@ -112,7 +105,6 @@ func patchDelta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 
 			numBytes := int(b)
 			buf := make([]byte, numBytes)
-			log.Printf("Inserting %d", numBytes)
 			deltar.read(buf)
 			_, err := result.Write(buf)
 			if err != nil {
@@ -218,9 +210,6 @@ func (er *errReader) readByte(p ...bool) byte {
 			return b[0]
 		}
 		er.err = fmt.Errorf("expected to read single byte and read none")
-	}
-	if len(p) != 0 {
-		log.Printf("Read %d", b[0])
 	}
 	return b[0]
 }

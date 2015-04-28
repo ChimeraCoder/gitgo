@@ -72,22 +72,23 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
 	for _, object := range objects {
 		if object.err != nil {
-			log.Printf("Found %s (%d) %s %s", object.Name, object.size, object.Type, object.err)
+			log.Printf("Found %s (%d) %s", object.Name, object.size, object.err)
 		}
 
-		if object.Type == OBJ_OFS_DELTA {
-			var base *packObject
+		if object.Type == OBJ_OFS_DELTA && object.err != nil {
 			// TODO improve this
 			// linear search to find the right offset
+			var base *packObject
 			for _, o := range objects {
-				log.Print(o.Offset)
 				if o.Offset == object.Offset-object.negativeOffset {
 					base = o
 					break
 				}
 			}
 			if base == nil {
-				return nil, fmt.Errorf("Could not find object with negative offset %d - %d", object.Offset, object.negativeOffset)
+				object.err = fmt.Errorf("could not find object with negative offset %d - %d for %s", object.Offset, object.negativeOffset, object.Name)
+			} else {
+				log.Printf("SUCCESS with %s", object.Name)
 			}
 		}
 
@@ -104,13 +105,10 @@ func parsePack(pack errReadSeeker, idx io.Reader) (objects []*packObject, err er
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("signature %+v", signature)
-
 	version := make([]byte, 4)
 	pack.read(version)
 
 	// TODO use encoding/binary here
-	log.Printf("version is %+v", version)
 	v := version[3]
 	switch v {
 	case 2:
@@ -125,8 +123,6 @@ func parsePack(pack errReadSeeker, idx io.Reader) (objects []*packObject, err er
 	default:
 		return nil, fmt.Errorf("cannot parse packfile with version %d", v)
 	}
-
-	return nil, nil
 }
 
 func Clone(r io.Reader) (*bufio.Reader, *bufio.Reader) {
@@ -156,6 +152,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 	}
 
 	for _, object := range objects {
+
 		var btsread int
 		r.Seek(int64(object.Offset), os.SEEK_SET)
 		_bytes := make([]byte, 1)
@@ -210,6 +207,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			if err != nil {
 				return nil, err
 			}
+
 			n, err := zr.Read(object.Data)
 			if err != nil {
 				if err == io.EOF {
@@ -233,12 +231,11 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			// for n >= 2 adding 2^7 + 2^14 + ... + 2^(7*(n-1))
 			// to the result."
 
-			log.Printf("encountered ofs delta")
-
 			var offset int
 			MSB := (_byte & 128) // will be either 128 or 0
 			var shift uint = 0
-			for MSB > 0 {
+
+			for {
 				// Keep reading the size until the MSB is 0
 				_bytes := make([]byte, 1)
 				r.read(_bytes)
@@ -248,14 +245,16 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 
 				offset += int((uint(_byte) & 127) << shift)
 				shift += 7
+
+				if MSB == 0 {
+					break
+				}
 			}
 			object.negativeOffset = offset
 			object.Data = make([]byte, objectSize)
 
 			zr, err := zlib.NewReader(r.r)
 			if err != nil {
-				log.Printf("Shift is %d", shift)
-				log.Printf("Object size is %d", objectSize)
 				object.err = err
 				continue
 			}
@@ -266,7 +265,9 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			}
 			object.Data = object.Data[:n]
 			zr.Close()
-			log.Printf("Ofs data is %q", object.Data)
+			if len(object.Data) != objectSize {
+				object.err = fmt.Errorf("received wrong object size: %d (expected %d)", object.Data, objectSize)
+			}
 
 		case object.Type == OBJ_REF_DELTA:
 			r.Seek(int64(object.Offset), os.SEEK_SET)
@@ -296,7 +297,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 
 func parseIdx(idx io.Reader, version int) (objects []*packObject, err error) {
 	if version != 2 {
-		return nil, fmt.Errorf("cannot parse IDX with version %d")
+		return nil, fmt.Errorf("cannot parse IDX with version %d", version)
 	}
 	// parse version 2 idxfile
 
