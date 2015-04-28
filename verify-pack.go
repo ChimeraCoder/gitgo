@@ -71,11 +71,24 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 
 	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
 	for _, object := range objects {
-		if object.err == nil {
-			log.Printf("Found %s (%d)  %s", object.Name, object.size, object.Type)
-		} else {
-
+		if object.err != nil {
 			log.Printf("Found %s (%d) %s %s", object.Name, object.size, object.Type, object.err)
+		}
+
+		if object.Type == OBJ_OFS_DELTA {
+			var base *packObject
+			// TODO improve this
+			// linear search to find the right offset
+			for _, o := range objects {
+				log.Print(o.Offset)
+				if o.Offset == object.Offset-object.negativeOffset {
+					base = o
+					break
+				}
+			}
+			if base == nil {
+				return nil, fmt.Errorf("Could not find object with negative offset %d - %d", object.Offset, object.negativeOffset)
+			}
 		}
 
 	}

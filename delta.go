@@ -8,8 +8,8 @@ import (
 	"os"
 )
 
-// Delta will apply a delta to a base.
-func Delta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
+// patchDelta will apply a delta to a base.
+func patchDelta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 	base := errReadSeeker{start, nil}
 	deltar := newErrReader(delta)
 
@@ -17,11 +17,13 @@ func Delta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 	// we can ignore err as long as we check deltar.err at the end
 	sourceLength, _ := parseVarInt(deltar)
 	targetLength, _ := parseVarInt(deltar)
+	log.Printf("Expecting target length %d", targetLength)
 	if deltar.err != nil {
 		return nil, deltar.err
 	}
 
-	result := bytes.NewBuffer(make([]byte, targetLength))
+	result := bytes.NewBuffer(nil)
+	//result = io.MultiWriter(result, os.Stderr)
 
 	// Now, the rest of the bytes are either copy or insert instructions
 	// If the MSB is set, it is a copy
@@ -32,65 +34,64 @@ func Delta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 		if n == 0 {
 			break
 		}
+
+		// b represents our command itself (opcode)
 		b := bs[0]
-		log.Printf("b is %d", b)
+		log.Printf("b is %08b", b)
 		switch b & 128 {
-		case 1:
-			// copy instruction
+		case 128:
+			// b is a copy instruction
 
+			// the last four bits represent the offset from the base (source)
 			var baseOffset int
-			// extract each of the four offset bits (last four bits)
-			o1 := (b & 1)
-			o2 := (b & 2)
-			o3 := (b & 3)
-			o4 := (b & 4)
-
-			if o1 > 0 {
-				baseOffset = baseOffset | int(uint8(deltar.readByte()))
+			if (b & 1) > 0 {
+				baseOffset = baseOffset | int(uint(deltar.readByte()))
 			}
 
-			if o2 > 0 {
-				baseOffset = baseOffset | int((uint8(deltar.readByte()) << 8))
+			if (b & 2) > 0 {
+				baseOffset = baseOffset | int((uint(deltar.readByte()) << 8))
 			}
 
-			if o3 > 0 {
-				baseOffset = baseOffset | int((uint8(deltar.readByte()) << 16))
+			if (b & 4) > 0 {
+				baseOffset = baseOffset | int((uint(deltar.readByte()) << 16))
 			}
 
-			if o4 > 0 {
-				baseOffset = baseOffset | int((uint8(deltar.readByte()) << 24))
+			if (b & 8) > 0 {
+				baseOffset = baseOffset | int((uint(deltar.readByte()) << 24))
 			}
 
 			// read the number of bytes to copy from source→target
 			// if the fifth bit from the right is set, read the next byte
 			// The number of copy bytes must fit into
 
-			var numBytes int
-			n1 := (b & 5)
-			n2 := (b & 6)
-			n3 := (b & 7)
+			var numBytes uint = 0
 
-			if n1 > 0 {
-				numBytes = numBytes | int(uint8(deltar.readByte()))
+			if (b & 16) > 0 {
+				numBytes = numBytes | uint(uint(deltar.readByte(true)))
+				log.Printf("16 %d", numBytes)
 			}
-			if n2 > 0 {
-				numBytes = numBytes | int((uint8(deltar.readByte()) << 8))
-			}
-
-			if n3 > 0 {
-				numBytes = numBytes | int((uint8(deltar.readByte()) << 16))
+			if (b & 32) > 0 {
+				numBytes = numBytes | uint((uint(deltar.readByte(true)) << 8))
+				log.Printf("32 %d", numBytes)
 			}
 
-			// read numBytes from source, starting at baseOffset
-			// and write that to the target
-			base.Seek(int64(baseOffset), os.SEEK_SET)
-			buf := make([]byte, numBytes)
-			base.read(buf)
+			if (b & 64) > 0 {
+				numBytes = numBytes | uint((uint(deltar.readByte(true)) << 16))
+				log.Printf("64 %d", numBytes)
+			}
 
 			// Default to 0x10000 due to overflow
 			if numBytes == 0 {
 				numBytes = 65536
 			}
+
+			log.Printf("copy offset %d", baseOffset)
+			log.Printf("copy length %d", numBytes)
+			// read numBytes from source, starting at baseOffset
+			// and write that to the target
+			base.Seek(int64(baseOffset), os.SEEK_SET)
+			buf := make([]byte, numBytes)
+			base.read(buf)
 
 			_, err := result.Write(buf)
 			if err != nil {
@@ -98,6 +99,11 @@ func Delta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 			}
 
 		case 0:
+			if b == 0 {
+				// cmd == 0 is reserved for future encoding extensions
+				return nil, fmt.Errorf("cannot process delta opcode 0")
+			}
+
 			// insert instruction
 			// this means we write data directly from delta to the target
 
@@ -106,15 +112,16 @@ func Delta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 
 			numBytes := int(b)
 			buf := make([]byte, numBytes)
-			log.Printf("Copying %d", numBytes)
+			log.Printf("Inserting %d", numBytes)
 			deltar.read(buf)
 			_, err := result.Write(buf)
 			if err != nil {
 				return nil, err
 			}
 
+		default:
+			return nil, fmt.Errorf("invalid opcode %08b", b)
 		}
-
 	}
 
 	n, err := base.Seek(0, os.SEEK_END)
@@ -123,6 +130,10 @@ func Delta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 	}
 	if n != int64(sourceLength) {
 		return nil, fmt.Errorf("expected to read %d bytes and read %d", sourceLength, n)
+	}
+
+	if deltar.err == io.EOF {
+		return result, nil
 	}
 	return result, deltar.err
 }
@@ -193,15 +204,12 @@ func (er *errReader) read(buf []byte) int {
 		return 0
 	}
 	n, er.err = io.ReadFull(er.r, buf)
-	if er.err != nil {
-		panic(er.err)
-	}
 	er.n += n
 	return n
 }
 
 // Like read(), but expect a single byte
-func (er *errReader) readByte() byte {
+func (er *errReader) readByte(p ...bool) byte {
 	b := make([]byte, 1)
 	n := er.read(b)
 	if n != 1 && er.err != nil {
@@ -210,6 +218,9 @@ func (er *errReader) readByte() byte {
 			return b[0]
 		}
 		er.err = fmt.Errorf("expected to read single byte and read none")
+	}
+	if len(p) != 0 {
+		log.Printf("Read %d", b[0])
 	}
 	return b[0]
 }

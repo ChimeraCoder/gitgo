@@ -10,47 +10,64 @@ import (
 	"testing"
 )
 
-func Test_Delta(t *testing.T) {
-	fin, err := os.Open("test_data/zlib.c")
-	if err != nil {
-		t.Error(err)
-		return
+func Test_PatchDelta(t *testing.T) {
+	suite := [][3]string{
+		[3]string{"test_data/test-delta.c", "test_data/test-delta-new.delta", "test_data/test-delta-new.c"},
+		[3]string{"test_data/zlib.c", "test_data/zlib-delta", "test_data/zlib-changed.c"},
 	}
 
-	deltaf, err := os.Open("test_data/zlib-delta")
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	for _, trpl := range suite {
 
-	expectedf, err := os.Open("test_data/zlib-changed.c")
-	if err != nil {
-		t.Error(err)
-		return
-	}
+		fin, err := os.Open(trpl[0])
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		defer fin.Close()
 
-	restored, err := Delta(fin, deltaf)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+		deltaf, err := os.Open(trpl[1])
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		defer deltaf.Close()
 
-	bts1, err := ioutil.ReadAll(expectedf)
-	if err != nil {
-		t.Error(err)
-	}
+		expectedf, err := os.Open(trpl[2])
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		defer expectedf.Close()
 
-	bts2, err := ioutil.ReadAll(restored)
-	if err != nil {
-		t.Error(err)
-	}
+		restored, err := patchDelta(fin, deltaf)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
 
-	if len(bts1) != len(bts2) {
-		t.Errorf("Expected %d bytes and received %d", len(bts1), len(bts2))
-	}
+		bts1, err := ioutil.ReadAll(expectedf)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
 
-	if !reflect.DeepEqual(bts1, bts2) {
-		t.Errorf("delta application failed")
+		bts2, err := ioutil.ReadAll(restored)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		if len(bts1) != len(bts2) {
+			t.Errorf("Expected %d bytes and received %d", len(bts1), len(bts2))
+			log.Printf("%q", bts2)
+			continue
+		}
+
+		if !reflect.DeepEqual(bts1, bts2) {
+			t.Errorf("delta application failed")
+			continue
+		}
+		log.Printf("SUCCESS")
 	}
 }
 
