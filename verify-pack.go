@@ -21,7 +21,10 @@ type packObject struct {
 
 	// only used for OBJ_OFS_DELTA
 	negativeOffset int
+	baseObjectName SHA
+	baseOffset     int
 
+	// the uncompressed size
 	size int
 
 	err error // was an error encountered while processing this object?
@@ -72,10 +75,9 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
 	for _, object := range objects {
 		if object.err != nil {
-			log.Printf("Found %s (%d) %s", object.Name, object.size, object.err)
+			continue
 		}
-
-		if object.Type == OBJ_OFS_DELTA && object.err != nil {
+		if object.Type == OBJ_OFS_DELTA {
 			// TODO improve this
 			// linear search to find the right offset
 			var base *packObject
@@ -88,10 +90,13 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 			if base == nil {
 				object.err = fmt.Errorf("could not find object with negative offset %d - %d for %s", object.Offset, object.negativeOffset, object.Name)
 			} else {
-				log.Printf("SUCCESS with %s", object.Name)
+				object.baseObjectName = base.Name
+				log.Printf("%s SUCCESS", object.Name)
 			}
 		}
-
+	}
+	for _, o := range objects {
+		log.Printf("%s: %d", o.Name, o.Offset)
 	}
 	return objects, err
 }
@@ -232,25 +237,58 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			// to the result."
 
 			var offset int
-			MSB := (_byte & 128) // will be either 128 or 0
-			var shift uint = 0
 
-			for {
+			if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
+				log.Print("\n\nasdf")
+			}
+			if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
+				log.Printf("offset is %08b", offset)
+			}
+
+			// number of bytes read in variable length encoding
+			var nbytes uint = 0
+
+			MSB := 128
+			for (MSB & 128) > 0 {
+				nbytes++
+
 				// Keep reading the size until the MSB is 0
 				_bytes := make([]byte, 1)
 				r.read(_bytes)
 				_byte := _bytes[0]
 
-				MSB = (_byte & 128)
+				if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
+					log.Printf("Read byte %08b", _byte)
+				}
+				sevenBytes := uint(_byte) & 127
 
-				offset += int((uint(_byte) & 127) << shift)
-				shift += 7
+				offset = (offset << 7) + int(sevenBytes)
 
+				if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
+					log.Printf("offset is %08b", offset)
+				}
+
+				MSB = int(_byte & 128)
 				if MSB == 0 {
 					break
 				}
 			}
+
+			if nbytes >= 2 {
+				offset += (1 << (7 * (nbytes - 1)))
+			}
+
+			if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
+				tmp := offset + (1 << (7 * (nbytes - 1)))
+				tmp2 := (1 << (7 * (nbytes - 1)))
+				log.Printf("offset is %d", offset)
+				log.Printf("tmp %d", tmp)
+				log.Printf("tmp2 %d", tmp2)
+				log.Printf("nbytes %d", nbytes)
+				log.Printf("offset is %08b\n\n", offset)
+			}
 			object.negativeOffset = offset
+			log.Printf("R %s %d %d", object.Name, object.Offset, object.negativeOffset)
 			object.Data = make([]byte, objectSize)
 
 			zr, err := zlib.NewReader(r.r)
