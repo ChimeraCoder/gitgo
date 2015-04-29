@@ -134,3 +134,18 @@ func Test_ParseBlob(t *testing.T) {
 	}
 
 }
+
+func Test_ParsePackfile(t *testing.T) {
+	const inputSha = SHA("c3b8133617bbdb72e237b0f163fade7fbf1f0c18")
+	const expected = 2160
+
+	result, err := NewObject(inputSha, RepoDir)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// TODO remove this type assertion
+	if len(result.(*packObject).PatchedData) != expected {
+		t.Errorf("expected and result don't match")
+	}
+}

@@ -3,10 +3,14 @@ package gitgo
 import (
 	"bufio"
 	"bytes"
+	"compress/zlib"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
+	"os"
+	"path"
 	"strings"
 )
 
@@ -85,9 +89,25 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 	if basedir == "" {
 		basedir = "."
 	}
-	r, err := readObjectFile(input, basedir)
+
+	filename := path.Join(basedir, "objects", string(input[:2]), string(input[2:]))
+
+	f, err := os.Open(filename)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("must check packfile")
+			obj, err := searchPacks(input, basedir)
+			if err != nil {
+				return nil, err
+			}
+			return obj, nil
+		}
 		return
+	}
+	defer f.Close()
+	r, err := zlib.NewReader(f)
+	if err != nil {
+		return nil, err
 	}
 	return parseObj(r, basedir)
 }

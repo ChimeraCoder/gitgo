@@ -1,95 +1,11 @@
 package gitgo
 
 import (
-	"bytes"
 	"compress/zlib"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"reflect"
-)
-
-type packObject struct {
-	Name        SHA
-	Offset      int
-	Data        []byte
-	Type        packObjectType
-	PatchedData []byte
-
-	Size int // the uncompressed size
-
-	SizeInPackfile int // the compressed size
-
-	// only used for OBJ_OFS_DELTA
-	negativeOffset int
-	BaseObjectName SHA
-	BaseObjectType packObjectType
-	baseOffset     int
-	Depth          int
-
-	err error // was an error encountered while processing this object?
-}
-
-func (p *packObject) Patch(dict map[SHA]*packObject) error {
-	if p.PatchedData != nil {
-		return nil
-	}
-	if p.Type < OBJ_OFS_DELTA {
-		if p.Data == nil {
-			return fmt.Errorf("base object data is nil")
-		}
-		p.PatchedData = p.Data
-		p.BaseObjectType = p.Type
-		return nil
-	}
-
-	if p.Type >= OBJ_OFS_DELTA {
-		base, ok := dict[p.BaseObjectName]
-		if !ok {
-			return fmt.Errorf("base object not in dictionary: %s", p.BaseObjectName)
-		}
-		err := base.Patch(dict)
-		if err != nil {
-			return err
-		}
-
-		// At the time patchDelta is called, we know that the base.PatchedData is non-nil
-		patched, err := patchDelta(bytes.NewReader(base.PatchedData), bytes.NewReader(p.Data))
-		if err != nil {
-			return err
-		}
-
-		p.PatchedData, err = ioutil.ReadAll(patched)
-		if err != nil {
-			return err
-		}
-
-		p.BaseObjectType = base.BaseObjectType
-		p.Depth += base.Depth
-	}
-	return nil
-}
-
-func (p *packObject) PatchedType() packObjectType {
-	if p.Type < OBJ_OFS_DELTA {
-		return p.Type
-	}
-	return p.BaseObjectType
-}
-
-//go:generate stringer -type=packObjectType
-type packObjectType uint8
-
-const (
-	_ packObjectType = iota
-	OBJ_COMMIT
-	OBJ_TREE
-	OBJ_BLOB
-	OBJ_TAG
-	_
-	OBJ_OFS_DELTA
-	OBJ_REF_DELTA
 )
 
 type errReadSeeker struct {
@@ -112,7 +28,8 @@ func (er *errReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	return er.r.Seek(offset, whence)
 }
 
-// VerifyPack extracts the objects from a packfile, using the index file provided
+// VerifyPack returns the pack objects contained in the packfile and
+// corresponding index file.
 func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 
 	objectsMap := map[SHA]*packObject{}
@@ -125,7 +42,7 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 		if object.err != nil {
 			continue
 		}
-		if object.Type == OBJ_OFS_DELTA {
+		if object._type == OBJ_OFS_DELTA {
 			// TODO improve this
 			// linear search to find the right offset
 			var base *packObject
@@ -144,7 +61,7 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 	}
 
 	for _, object := range objectsMap {
-		if object.Type == OBJ_OFS_DELTA {
+		if object._type == OBJ_OFS_DELTA {
 
 			object.err = object.Patch(objectsMap)
 
@@ -211,7 +128,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 		// This will extract the last three bits of
 		// the first nibble in the byte
 		// which tells us the object type
-		object.Type = packObjectType(((_byte >> 4) & 7))
+		object._type = packObjectType(((_byte >> 4) & 7))
 
 		// determine the (decompressed) object size
 		// and then deflate the following bytes
@@ -244,7 +161,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 
 		object.Size = objectSize
 		switch {
-		case object.Type < 5:
+		case object._type < 5:
 			// the object is a commit, tree, blob, or tag
 
 			// (objectSize) is the size, in bytes, of this object *when expanded*
@@ -271,7 +188,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				return nil, fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
 			}
 
-		case object.Type == OBJ_OFS_DELTA:
+		case object._type == OBJ_OFS_DELTA:
 			// read the n-byte offset
 			// from the git docs:
 			// "n bytes with MSB set in all but the last one.
@@ -328,7 +245,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				object.err = fmt.Errorf("received wrong object size: %d (expected %d)", object.Data, objectSize)
 			}
 
-		case object.Type == OBJ_REF_DELTA:
+		case object._type == OBJ_REF_DELTA:
 			r.Seek(int64(object.Offset), os.SEEK_SET)
 			// Read the 20-byte base object name
 			baseObjName := make([]byte, 20)
