@@ -1,28 +1,44 @@
 package gitgo
 
 import (
+	"fmt"
+	"io"
+	"io/ioutil"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
 )
 
-func Test_CatFile(t *testing.T) {
-	const inputSha = SHA("97eed02ebe122df8fdd853c1215d8775f3d9f1a1")
-	const expected = "commit 190\x00" + `tree 9de6c72106b169990a83ce7090c7cad84b6b506b
-author aditya <dev@chimeracoder.net> 1428075900 -0400
-committer aditya <dev@chimeracoder.net> 1428075900 -0400
+var RepoDir = path.Join("test_data", "dot_git")
 
-First commit. Create .gitignore`
-	result, err := CatFile(inputSha)
+func ReadAll(t *testing.T, r io.Reader) []byte {
+	bts, err := ioutil.ReadAll(r)
+	if err != nil {
+		t.Error(err)
+	}
+	return bts
+}
+
+// ReaderEqual tests that two readers read the same number of bytes
+// and read the same content
+func ReaderEqual(t *testing.T, r1 io.Reader, expected io.Reader) (err error) {
+	bts1, err := ioutil.ReadAll(r1)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-
-	if strings.Trim(result, "\n\r") != strings.Trim(expected, "\n\r") {
-
-		t.Errorf("Expected and result don't match:\n%s \n\n\nresult: \n%s", expected, result)
+	bts2, err := ioutil.ReadAll(expected)
+	if err != nil {
+		t.Error(err)
+		return
 	}
+	if !reflect.DeepEqual(bts1, bts2) {
+		err = fmt.Errorf("Actual does not match expected: %s, %s", string(bts1), string(bts2))
+		t.Error(err)
+		return
+	}
+	return nil
 }
 
 func Test_parseObjInitialCommit(t *testing.T) {
@@ -41,7 +57,8 @@ author aditya <dev@chimeracoder.net> 1428075900 -0400
 committer aditya <dev@chimeracoder.net> 1428075900 -0400
 
 First commit. Create .gitignore`
-	result, err := parseObj(input)
+
+	result, err := parseObj(strings.NewReader(input), "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -52,8 +69,9 @@ First commit. Create .gitignore`
 	}
 }
 
-func Test_parseObj(t *testing.T) {
+func Test_parseObjTreeCommit(t *testing.T) {
 	const inputSha = SHA("3ead3116d0378089f5ce61086354aac43e736b01")
+	const fileContents = "commit 243\x00tree d22fc8a57073fdecae2001d00aff921440d3aabd\nparent 1d833eb5b6c5369c0cb7a4a3e20ded237490145f\nauthor aditya <dev@chimeracoder.net> 1428349896 -0400\ncommitter aditya <dev@chimeracoder.net> 1428349896 -0400\n\nRemove extraneous logging statements\n"
 
 	expected := Commit{
 		_type:     "commit",
@@ -65,12 +83,7 @@ func Test_parseObj(t *testing.T) {
 		size:      "243",
 	}
 
-	str, err := CatFile(inputSha)
-	if err != nil {
-		t.Error(err)
-	}
-
-	result, err := parseObj(str)
+	result, err := parseObj(strings.NewReader(fileContents), "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -95,7 +108,7 @@ func Test_ParseTree(t *testing.T) {
 			objectMeta{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
 		},
 	}
-	result, err := NewObject(inputSha)
+	result, err := NewObject(inputSha, RepoDir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -112,7 +125,7 @@ func Test_ParseBlob(t *testing.T) {
 		size:     "18",
 		Contents: "*.swp\n*.swo\n*.swn\n",
 	}
-	result, err := NewObject(inputSha)
+	result, err := NewObject(inputSha, RepoDir)
 	if err != nil {
 		t.Error(err)
 	}

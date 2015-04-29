@@ -3,25 +3,27 @@ package gitgo
 import (
 	"compress/zlib"
 
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 )
 
-type KeyType string
+type keyType string
 
+// SHA represents the SHA-1 hash used by git
 type SHA string
 
 const (
-	TreeKey      KeyType = "tree"
-	ParentKey            = "parent"
-	AuthorKey            = "author"
-	CommitterKey         = "committer"
+	treeKey      keyType = "tree"
+	parentKey            = "parent"
+	authorKey            = "author"
+	committerKey         = "committer"
 )
 
-func CatFile(input SHA) (result string, err error) {
-
-	filename := path.Join(".git", "objects", string(input[:2]), string(input[2:]))
+// readObjectFile returns an io.Reader that reads the object file
+// corresponding to the given SHA
+func readObjectFile(input SHA, basedir string) (result io.Reader, err error) {
+	filename := path.Join(basedir, "objects", string(input[:2]), string(input[2:]))
 
 	f, err := os.Open(filename)
 	if err != nil {
@@ -29,15 +31,5 @@ func CatFile(input SHA) (result string, err error) {
 	}
 	defer f.Close()
 
-	r, err := zlib.NewReader(f)
-	if err != nil {
-		return
-	}
-
-	bts, err := ioutil.ReadAll(r)
-	if err != nil {
-		return
-	}
-
-	return string(bts), nil
+	return zlib.NewReader(f)
 }

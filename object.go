@@ -6,9 +6,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 )
 
+// GitObject represents a commit, tree, or blob.
+// Under the hood, these may be objects stored directly
+// or through packfiles
 type GitObject interface {
 	Type() string
 }
@@ -32,6 +36,7 @@ type gitObject struct {
 	Contents string
 }
 
+// A Blob compresses content from a file
 type Blob struct {
 	_type    string
 	size     string
@@ -40,7 +45,6 @@ type Blob struct {
 
 func (b Blob) Type() string {
 	return b._type
-
 }
 
 type Commit struct {
@@ -77,12 +81,15 @@ type objectMeta struct {
 	filename string
 }
 
-func NewObject(input SHA) (obj GitObject, err error) {
-	str, err := CatFile(input)
+func NewObject(input SHA, basedir string) (obj GitObject, err error) {
+	if basedir == "" {
+		basedir = "."
+	}
+	r, err := readObjectFile(input, basedir)
 	if err != nil {
 		return
 	}
-	return parseObj(str)
+	return parseObj(r, basedir)
 }
 
 func normalizePerms(perms string) string {
@@ -93,7 +100,12 @@ func normalizePerms(perms string) string {
 	return perms
 }
 
-func parseObj(obj string) (result GitObject, err error) {
+func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
+	bts, err := ioutil.ReadAll(r)
+	if err != nil {
+		return result, err
+	}
+	obj := string(bts)
 
 	parts := strings.Split(obj, "\x00")
 	parts = strings.Fields(parts[0])
@@ -114,17 +126,17 @@ func parseObj(obj string) (result GitObject, err error) {
 			}
 			parts := strings.Fields(line)
 			key := parts[0]
-			switch KeyType(key) {
-			case TreeKey:
+			switch keyType(key) {
+			case treeKey:
 				commit.Tree = parts[1]
-			case ParentKey:
+			case parentKey:
 				commit.Parents = append(commit.Parents, parts[1])
-			case AuthorKey:
+			case authorKey:
 				commit.Author = strings.Join(parts[1:], " ")
-			case CommitterKey:
+			case committerKey:
 				commit.Committer = strings.Join(parts[1:], " ")
 			default:
-				err = fmt.Errorf("Encountered unknown field in commit: %s", key)
+				err = fmt.Errorf("encountered unknown field in commit: %s", key)
 				return
 			}
 		}
@@ -190,7 +202,7 @@ func parseObj(obj string) (result GitObject, err error) {
 		}
 
 		for _, part := range resultObjs {
-			obj, err := NewObject(part.Hash)
+			obj, err := NewObject(part.Hash, basedir)
 			if err != nil {
 				return tree, err
 			}
