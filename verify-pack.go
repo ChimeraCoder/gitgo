@@ -91,7 +91,7 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 				object.err = fmt.Errorf("could not find object with negative offset %d - %d for %s", object.Offset, object.negativeOffset, object.Name)
 			} else {
 				object.baseObjectName = base.Name
-				log.Printf("%s SUCCESS", object.Name)
+				log.Printf("%s %d SUCCESS", object.Name, object.baseOffset)
 			}
 		}
 	}
@@ -238,13 +238,6 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 
 			var offset int
 
-			if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
-				log.Print("\n\nasdf")
-			}
-			if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
-				log.Printf("offset is %08b", offset)
-			}
-
 			// number of bytes read in variable length encoding
 			var nbytes uint = 0
 
@@ -257,16 +250,9 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				r.read(_bytes)
 				_byte := _bytes[0]
 
-				if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
-					log.Printf("Read byte %08b", _byte)
-				}
 				sevenBytes := uint(_byte) & 127
 
 				offset = (offset << 7) + int(sevenBytes)
-
-				if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
-					log.Printf("offset is %08b", offset)
-				}
 
 				MSB = int(_byte & 128)
 				if MSB == 0 {
@@ -278,17 +264,8 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				offset += (1 << (7 * (nbytes - 1)))
 			}
 
-			if object.Name == "b45377f6daf59a4cec9e8de64f5df1533a7994cd" {
-				tmp := offset + (1 << (7 * (nbytes - 1)))
-				tmp2 := (1 << (7 * (nbytes - 1)))
-				log.Printf("offset is %d", offset)
-				log.Printf("tmp %d", tmp)
-				log.Printf("tmp2 %d", tmp2)
-				log.Printf("nbytes %d", nbytes)
-				log.Printf("offset is %08b\n\n", offset)
-			}
 			object.negativeOffset = offset
-			log.Printf("R %s %d %d", object.Name, object.Offset, object.negativeOffset)
+			object.baseOffset = object.Offset - object.negativeOffset
 			object.Data = make([]byte, objectSize)
 
 			zr, err := zlib.NewReader(r.r)
