@@ -21,9 +21,8 @@ const (
 
 // readObjectFile returns an io.Reader that reads the object file
 // corresponding to the given SHA
-func readObjectFile(input SHA) (result io.Reader, err error) {
-
-	filename := path.Join(".git", "objects", string(input[:2]), string(input[2:]))
+func readObjectFile(input SHA, basedir string) (result io.Reader, err error) {
+	filename := path.Join(basedir, "objects", string(input[:2]), string(input[2:]))
 
 	f, err := os.Open(filename)
 	if err != nil {

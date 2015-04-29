@@ -9,8 +9,7 @@ import (
 )
 
 func Test_GetIdxPath(t *testing.T) {
-	var testDirPath = "test_data/dot_git/"
-	result, err := GetIdxPath(testDirPath)
+	result, err := GetIdxPath(REPO_DIR)
 
 	if err != nil {
 		t.Error(err)
@@ -18,7 +17,7 @@ func Test_GetIdxPath(t *testing.T) {
 	}
 
 	expected := path.Join(
-		testDirPath,
+		REPO_DIR,
 		"objects/pack",
 		"pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx",
 	)
@@ -30,7 +29,7 @@ func Test_GetIdxPath(t *testing.T) {
 
 func Test_VerifyPack(t *testing.T) {
 
-    // only used for git verify-pack -v
+	// only used for git verify-pack -v
 	const expected = `fe89ee30bbcdfdf376beae530cc53f967012f31c commit 267 184 12
 3ead3116d0378089f5ce61086354aac43e736b01 commit 243 170 196
 1d833eb5b6c5369c0cb7a4a3e20ded237490145f commit 262 180 366
@@ -55,14 +54,14 @@ chain length = 2: 1 object
 
 `
 
-	packFile, err := os.Open("test_data/dot_git/objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.pack")
+	packFile, err := os.Open(path.Join(REPO_DIR, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.pack"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer packFile.Close()
 
-	idxFile, err := os.Open("test_data/dot_git/objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx")
+	idxFile, err := os.Open(path.Join(REPO_DIR, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx"))
 	if err != nil {
 		t.Error(err)
 		return

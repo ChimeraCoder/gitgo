@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+var REPO_DIR = path.Join("test_data", "dot_git")
 
 func ReadAll(t *testing.T, r io.Reader) []byte {
 	bts, err := ioutil.ReadAll(r)
@@ -55,7 +58,7 @@ committer aditya <dev@chimeracoder.net> 1428075900 -0400
 
 First commit. Create .gitignore`
 
-	result, err := parseObj(strings.NewReader(input))
+	result, err := parseObj(strings.NewReader(input), "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -80,7 +83,7 @@ func Test_parseObjTreeCommit(t *testing.T) {
 		size:      "243",
 	}
 
-	result, err := parseObj(strings.NewReader(fileContents))
+	result, err := parseObj(strings.NewReader(fileContents), "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -105,7 +108,7 @@ func Test_ParseTree(t *testing.T) {
 			objectMeta{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
 		},
 	}
-	result, err := NewObject(inputSha)
+	result, err := NewObject(inputSha, REPO_DIR)
 	if err != nil {
 		t.Error(err)
 	}
@@ -122,7 +125,7 @@ func Test_ParseBlob(t *testing.T) {
 		size:     "18",
 		Contents: "*.swp\n*.swo\n*.swn\n",
 	}
-	result, err := NewObject(inputSha)
+	result, err := NewObject(inputSha, REPO_DIR)
 	if err != nil {
 		t.Error(err)
 	}

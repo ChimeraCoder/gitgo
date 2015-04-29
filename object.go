@@ -78,12 +78,15 @@ type objectMeta struct {
 	filename string
 }
 
-func NewObject(input SHA) (obj GitObject, err error) {
-	r, err := readObjectFile(input)
+func NewObject(input SHA, basedir string) (obj GitObject, err error) {
+	if basedir == "" {
+		basedir = "."
+	}
+	r, err := readObjectFile(input, basedir)
 	if err != nil {
 		return
 	}
-	return parseObj(r)
+	return parseObj(r, basedir)
 }
 
 func normalizePerms(perms string) string {
@@ -94,7 +97,7 @@ func normalizePerms(perms string) string {
 	return perms
 }
 
-func parseObj(r io.Reader) (result GitObject, err error) {
+func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
 	bts, err := ioutil.ReadAll(r)
 	if err != nil {
 		return result, err
@@ -196,7 +199,7 @@ func parseObj(r io.Reader) (result GitObject, err error) {
 		}
 
 		for _, part := range resultObjs {
-			obj, err := NewObject(part.Hash)
+			obj, err := NewObject(part.Hash, basedir)
 			if err != nil {
 				return tree, err
 			}
