@@ -1,15 +1,12 @@
 package gitgo
 
 import (
-	"bufio"
 	"bytes"
 	"compress/zlib"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
-	"path/filepath"
 	"reflect"
 )
 
@@ -115,12 +112,7 @@ func (er *errReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	return er.r.Seek(offset, whence)
 }
 
-func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
-	files, err := filepath.Glob(path.Join(dotGitRootPath, "objects/pack", "*.idx"))
-	idxFilePath = files[0]
-	return
-}
-
+// VerifyPack extracts the objects from a packfile, using the index file provided
 func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 
 	objectsMap := map[SHA]*packObject{}
@@ -190,14 +182,6 @@ func parsePack(pack errReadSeeker, idx io.Reader) (objects []*packObject, err er
 	}
 }
 
-func Clone(r io.Reader) (*bufio.Reader, *bufio.Reader) {
-	var b1 bytes.Buffer
-	var b2 bytes.Buffer
-	w := io.MultiWriter(&b1, &b2)
-	io.Copy(w, r)
-	return bufio.NewReader(&b1), bufio.NewReader(&b2)
-}
-
 func bytesToNum(b []byte) uint {
 	var n uint
 	for i := 0; i < len(b); i++ {
@@ -238,7 +222,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 		MSB := (_byte & 128) // will be either 128 or 0
 
 		// This will extract the last four bits of the byte
-		var objectSize int = int((uint(_byte) & 15))
+		var objectSize = int((uint(_byte) & 15))
 
 		// shift the first size by 0
 		// and the rest by 4 + (i-1) * 7
@@ -299,7 +283,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			var offset int
 
 			// number of bytes read in variable length encoding
-			var nbytes uint = 0
+			var nbytes uint
 
 			MSB := 128
 			for (MSB & 128) > 0 {

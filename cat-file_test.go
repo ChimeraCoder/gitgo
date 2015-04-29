@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-var REPO_DIR = path.Join("test_data", "dot_git")
+var RepoDir = path.Join("test_data", "dot_git")
 
 func ReadAll(t *testing.T, r io.Reader) []byte {
 	bts, err := ioutil.ReadAll(r)
@@ -108,7 +108,7 @@ func Test_ParseTree(t *testing.T) {
 			objectMeta{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
 		},
 	}
-	result, err := NewObject(inputSha, REPO_DIR)
+	result, err := NewObject(inputSha, RepoDir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -125,7 +125,7 @@ func Test_ParseBlob(t *testing.T) {
 		size:     "18",
 		Contents: "*.swp\n*.swo\n*.swn\n",
 	}
-	result, err := NewObject(inputSha, REPO_DIR)
+	result, err := NewObject(inputSha, RepoDir)
 	if err != nil {
 		t.Error(err)
 	}

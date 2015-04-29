@@ -147,11 +147,11 @@ func parseVarInt(r io.Reader) (int, error) {
 	MSB := (_byte & 128) // will be either 128 or 0
 
 	// This will extract the last seven bits of the byte
-	var objectSize int = int((uint(_byte) & 127))
+	var objectSize = int((uint(_byte) & 127))
 
 	// shift the first size by 0
 	// and the rest by (i-1) * 7
-	var shift uint = 0
+	var shift uint
 
 	// If the most-significant bit is 0, this is the last byte
 	// for the object size

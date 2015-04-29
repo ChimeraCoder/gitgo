@@ -4,28 +4,8 @@ import (
 	"log"
 	"os"
 	"path"
-	"reflect"
 	"testing"
 )
-
-func Test_GetIdxPath(t *testing.T) {
-	result, err := GetIdxPath(REPO_DIR)
-
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	expected := path.Join(
-		REPO_DIR,
-		"objects/pack",
-		"pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx",
-	)
-
-	if !reflect.DeepEqual(expected, result) {
-		t.Errorf("Expected and result don't match:\n%+v\n%+v", expected, result)
-	}
-}
 
 func Test_VerifyPack(t *testing.T) {
 
@@ -54,14 +34,14 @@ chain length = 2: 1 object
 
 `
 
-	packFile, err := os.Open(path.Join(REPO_DIR, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.pack"))
+	packFile, err := os.Open(path.Join(RepoDir, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.pack"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer packFile.Close()
 
-	idxFile, err := os.Open(path.Join(REPO_DIR, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx"))
+	idxFile, err := os.Open(path.Join(RepoDir, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -119,10 +99,10 @@ chain length = 2: 1 object
 			t.Errorf("Expected Type.String() %s and received %s", expectedObj.Type.String(), object.Type.String())
 		}
 		if expectedObj.Size != object.Size {
-			t.Errorf("Expected Size %s and received %s", expectedObj.Size, object.Size)
+			t.Errorf("Expected Size %d and received %d", expectedObj.Size, object.Size)
 		}
 		if expectedObj.Offset != object.Offset {
-			t.Errorf("Expected Offset %s and received %s", expectedObj.Offset, object.Offset)
+			t.Errorf("Expected Offset %d and received %d", expectedObj.Offset, object.Offset)
 		}
 	}
 

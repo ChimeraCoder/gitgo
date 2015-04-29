@@ -10,6 +10,9 @@ import (
 	"strings"
 )
 
+// GitObject represents a commit, tree, or blob.
+// Under the hood, these may be objects stored directly
+// or through packfiles
 type GitObject interface {
 	Type() string
 }
@@ -33,6 +36,7 @@ type gitObject struct {
 	Contents string
 }
 
+// A Blob compresses content from a file
 type Blob struct {
 	_type    string
 	size     string
@@ -41,7 +45,6 @@ type Blob struct {
 
 func (b Blob) Type() string {
 	return b._type
-
 }
 
 type Commit struct {
@@ -123,14 +126,14 @@ func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
 			}
 			parts := strings.Fields(line)
 			key := parts[0]
-			switch KeyType(key) {
-			case TreeKey:
+			switch keyType(key) {
+			case treeKey:
 				commit.Tree = parts[1]
-			case ParentKey:
+			case parentKey:
 				commit.Parents = append(commit.Parents, parts[1])
-			case AuthorKey:
+			case authorKey:
 				commit.Author = strings.Join(parts[1:], " ")
-			case CommitterKey:
+			case committerKey:
 				commit.Committer = strings.Join(parts[1:], " ")
 			default:
 				err = fmt.Errorf("encountered unknown field in commit: %s", key)

@@ -8,15 +8,16 @@ import (
 	"path"
 )
 
-type KeyType string
+type keyType string
 
+// SHA represents the SHA-1 hash used by git
 type SHA string
 
 const (
-	TreeKey      KeyType = "tree"
-	ParentKey            = "parent"
-	AuthorKey            = "author"
-	CommitterKey         = "committer"
+	treeKey      keyType = "tree"
+	parentKey            = "parent"
+	authorKey            = "author"
+	committerKey         = "committer"
 )
 
 // readObjectFile returns an io.Reader that reads the object file
