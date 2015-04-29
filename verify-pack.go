@@ -6,6 +6,7 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,24 +14,71 @@ import (
 )
 
 type packObject struct {
-	Name   SHA
-	Offset int
-	Data   []byte
-	Type   packObjectType
+	Name        SHA
+	Offset      int
+	Data        []byte
+	Type        packObjectType
+	PatchedData []byte
+
+	Size int // the uncompressed size
+
+	SizeInPackfile int // the compressed size
 
 	// only used for OBJ_OFS_DELTA
 	negativeOffset int
 	BaseObjectName SHA
+	BaseObjectType packObjectType
 	baseOffset     int
 	Depth          int
 
-	// the uncompressed size
-	Size int
-
-	// the compressed size
-	SizeInPackfile int
-
 	err error // was an error encountered while processing this object?
+}
+
+func (p *packObject) Patch(dict map[SHA]*packObject) error {
+	if p.PatchedData != nil {
+		return nil
+	}
+	if p.Type < OBJ_OFS_DELTA {
+		if p.Data == nil {
+			return fmt.Errorf("base object data is nil")
+		}
+		p.PatchedData = p.Data
+		p.BaseObjectType = p.Type
+		return nil
+	}
+
+	if p.Type >= OBJ_OFS_DELTA {
+		base, ok := dict[p.BaseObjectName]
+		if !ok {
+			return fmt.Errorf("base object not in dictionary: %s", p.BaseObjectName)
+		}
+		err := base.Patch(dict)
+		if err != nil {
+			return err
+		}
+
+		// At the time patchDelta is called, we know that the base.PatchedData is non-nil
+		patched, err := patchDelta(bytes.NewReader(base.PatchedData), bytes.NewReader(p.Data))
+		if err != nil {
+			return err
+		}
+
+		p.PatchedData, err = ioutil.ReadAll(patched)
+		if err != nil {
+			return err
+		}
+
+		p.BaseObjectType = base.BaseObjectType
+		p.Depth += base.Depth
+	}
+	return nil
+}
+
+func (p *packObject) PatchedType() packObjectType {
+	if p.Type < OBJ_OFS_DELTA {
+		return p.Type
+	}
+	return p.BaseObjectType
 }
 
 //go:generate stringer -type=packObjectType
@@ -75,8 +123,13 @@ func GetIdxPath(dotGitRootPath string) (idxFilePath string, err error) {
 
 func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 
+	objectsMap := map[SHA]*packObject{}
 	objects, err := parsePack(errReadSeeker{pack, nil}, idx)
 	for _, object := range objects {
+		objectsMap[object.Name] = object
+	}
+
+	for _, object := range objectsMap {
 		if object.err != nil {
 			continue
 		}
@@ -95,9 +148,13 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 				continue
 			}
 			object.BaseObjectName = base.Name
+		}
+	}
 
-			_, err := patchDelta(bytes.NewReader(base.Data), bytes.NewReader(object.Data))
-			object.err = err
+	for _, object := range objectsMap {
+		if object.Type == OBJ_OFS_DELTA {
+
+			object.err = object.Patch(objectsMap)
 
 		}
 	}

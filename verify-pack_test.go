@@ -1,6 +1,7 @@
 package gitgo
 
 import (
+	"log"
 	"os"
 	"path"
 	"reflect"
@@ -28,6 +29,8 @@ func Test_GetIdxPath(t *testing.T) {
 }
 
 func Test_VerifyPack(t *testing.T) {
+
+    // only used for git verify-pack -v
 	const expected = `fe89ee30bbcdfdf376beae530cc53f967012f31c commit 267 184 12
 3ead3116d0378089f5ce61086354aac43e736b01 commit 243 170 196
 1d833eb5b6c5369c0cb7a4a3e20ded237490145f commit 262 180 366
@@ -101,6 +104,8 @@ chain length = 2: 1 object
 			t.Errorf("encountered incorrect hash %s", object.Name)
 		}
 		if object.err != nil {
+			log.Printf("%+v", object)
+			log.Printf("%+v", object.err)
 			t.Errorf("error reading object %s: %s", object.Name, object.err)
 		}
 		if expectedObj.Type != object.Type && object.Type != OBJ_OFS_DELTA {
@@ -111,7 +116,7 @@ chain length = 2: 1 object
 			t.Errorf("Expected Name %s and received %s", expectedObj.Name, object.Name)
 		}
 
-		if expectedObj.Type.String() != object.Type.String() {
+		if expectedObj.Type.String() != object.PatchedType().String() {
 			t.Errorf("Expected Type.String() %s and received %s", expectedObj.Type.String(), object.Type.String())
 		}
 		if expectedObj.Size != object.Size {
