@@ -6,7 +6,6 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -91,12 +90,8 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 				object.err = fmt.Errorf("could not find object with negative offset %d - %d for %s", object.Offset, object.negativeOffset, object.Name)
 			} else {
 				object.baseObjectName = base.Name
-				log.Printf("%s %d SUCCESS", object.Name, object.baseOffset)
 			}
 		}
-	}
-	for _, o := range objects {
-		log.Printf("%s: %d", o.Name, o.Offset)
 	}
 	return objects, err
 }
