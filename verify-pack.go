@@ -20,11 +20,15 @@ type packObject struct {
 
 	// only used for OBJ_OFS_DELTA
 	negativeOffset int
-	baseObjectName SHA
+	BaseObjectName SHA
 	baseOffset     int
+	Depth          int
 
 	// the uncompressed size
-	size int
+	Size int
+
+	// the compressed size
+	SizeInPackfile int
 
 	err error // was an error encountered while processing this object?
 }
@@ -88,9 +92,9 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 			}
 			if base == nil {
 				object.err = fmt.Errorf("could not find object with negative offset %d - %d for %s", object.Offset, object.negativeOffset, object.Name)
-			} else {
-				object.baseObjectName = base.Name
+				continue
 			}
+			object.BaseObjectName = base.Name
 		}
 	}
 	return objects, err
@@ -193,7 +197,7 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 			shift += 7
 		}
 
-		object.size = objectSize
+		object.Size = objectSize
 		switch {
 		case object.Type < 5:
 			// the object is a commit, tree, blob, or tag
