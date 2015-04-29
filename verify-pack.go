@@ -95,6 +95,10 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 				continue
 			}
 			object.BaseObjectName = base.Name
+
+			_, err := patchDelta(bytes.NewReader(base.Data), bytes.NewReader(object.Data))
+			object.err = err
+
 		}
 	}
 	return objects, err
