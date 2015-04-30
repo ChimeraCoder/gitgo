@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -19,7 +19,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(result)
+		io.Copy(os.Stdout, result)
 
 	default:
 		log.Fatalf("no such command: %s", module)

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -95,7 +94,6 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("must check packfile")
 			obj, err := searchPacks(input, basedir)
 			if err != nil {
 				return nil, err
