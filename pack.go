@@ -61,7 +61,7 @@ func (p *packObject) Commit(basedir string) (Commit, error) {
 		p.PatchedData = p.Data
 	}
 
-	commit, err := parseCommit(bytes.NewReader(p.PatchedData), basedir)
+	commit, err := parseCommit(bytes.NewReader(p.PatchedData), strconv.Itoa(p.Size), p.Name)
 	return commit, err
 }
 

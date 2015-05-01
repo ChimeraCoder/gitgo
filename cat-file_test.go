@@ -42,8 +42,10 @@ func ReaderEqual(t *testing.T, r1 io.Reader, expected io.Reader) (err error) {
 }
 
 func Test_parseObjInitialCommit(t *testing.T) {
+	const inputSHA = SHA("97eed02ebe122df8fdd853c1215d8775f3d9f1a1")
 	expected := Commit{
 		_type:     "commit",
+		Name:      inputSHA,
 		Tree:      "9de6c72106b169990a83ce7090c7cad84b6b506b",
 		Parents:   nil,
 		Author:    "aditya <dev@chimeracoder.net> 1428075900 -0400",
@@ -51,14 +53,13 @@ func Test_parseObjInitialCommit(t *testing.T) {
 		Message:   []byte("First commit. Create .gitignore"),
 		size:      "190",
 	}
-
 	const input = "commit 190\x00" + `tree 9de6c72106b169990a83ce7090c7cad84b6b506b
 author aditya <dev@chimeracoder.net> 1428075900 -0400
 committer aditya <dev@chimeracoder.net> 1428075900 -0400
 
 First commit. Create .gitignore`
 
-	result, err := parseObj(strings.NewReader(input), "")
+	result, err := parseObj(strings.NewReader(input), inputSHA, "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -70,11 +71,12 @@ First commit. Create .gitignore`
 }
 
 func Test_parseObjTreeCommit(t *testing.T) {
-	const inputSha = SHA("3ead3116d0378089f5ce61086354aac43e736b01")
+	const inputSHA = SHA("3ead3116d0378089f5ce61086354aac43e736b01")
 	const fileContents = "commit 243\x00tree d22fc8a57073fdecae2001d00aff921440d3aabd\nparent 1d833eb5b6c5369c0cb7a4a3e20ded237490145f\nauthor aditya <dev@chimeracoder.net> 1428349896 -0400\ncommitter aditya <dev@chimeracoder.net> 1428349896 -0400\n\nRemove extraneous logging statements\n"
 
 	expected := Commit{
 		_type:     "commit",
+		Name:      inputSHA,
 		Tree:      "d22fc8a57073fdecae2001d00aff921440d3aabd",
 		Parents:   []SHA{"1d833eb5b6c5369c0cb7a4a3e20ded237490145f"},
 		Author:    "aditya <dev@chimeracoder.net> 1428349896 -0400",
@@ -83,7 +85,7 @@ func Test_parseObjTreeCommit(t *testing.T) {
 		size:      "243",
 	}
 
-	result, err := parseObj(strings.NewReader(fileContents), "")
+	result, err := parseObj(strings.NewReader(fileContents), inputSHA, "")
 	if err != nil {
 		t.Error(err)
 		return

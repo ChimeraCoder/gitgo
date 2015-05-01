@@ -53,6 +53,7 @@ func (b Blob) Type() string {
 
 type Commit struct {
 	_type     string
+	Name      SHA
 	Tree      string
 	Parents   []SHA
 	Author    string
@@ -108,7 +109,7 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseObj(r, basedir)
+	return parseObj(r, input, basedir)
 }
 
 func normalizePerms(perms string) string {
@@ -119,7 +120,7 @@ func normalizePerms(perms string) string {
 	return perms
 }
 
-func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
+func parseObj(r io.Reader, name SHA, basedir string) (result GitObject, err error) {
 	// TODO fixme
 	bts, err := ioutil.ReadAll(r)
 	if err != nil {
@@ -135,7 +136,7 @@ func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
 
 	switch resultType {
 	case "commit":
-		return parseCommit(bytes.NewReader(obj[nullIndex+1:]), resultSize)
+		return parseCommit(bytes.NewReader(obj[nullIndex+1:]), resultSize, name)
 	case "tree":
 		return parseTree(bytes.NewReader(obj), resultSize, basedir)
 
@@ -166,7 +167,7 @@ func ScanNullLines(data []byte, atEOF bool) (advance int, token []byte, err erro
 	return 0, nil, nil
 }
 
-func parseCommit(r io.Reader, resultSize string) (Commit, error) {
+func parseCommit(r io.Reader, resultSize string, name SHA) (Commit, error) {
 	var commit = Commit{_type: "commit", size: resultSize}
 	bts, err := ioutil.ReadAll(r)
 	if err != nil {
@@ -195,6 +196,7 @@ func parseCommit(r io.Reader, resultSize string) (Commit, error) {
 			return commit, err
 		}
 	}
+	commit.Name = name
 	return commit, nil
 }
 

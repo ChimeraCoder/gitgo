@@ -97,7 +97,7 @@ chain length = 2: 1 object
 			t.Errorf("error reading object %s: %s", object.Name, object.err)
 		}
 		if expectedObj.Type.String() != object.Type() && object.Type() != OBJ_OFS_DELTA.String() {
-			t.Errorf("expected type %s and received type %s", expectedObj.Type, object.Type)
+			t.Errorf("expected type %s and received type %s", expectedObj.Type, object.Type())
 		}
 
 		if expectedObj.Name != object.Name {
@@ -105,7 +105,7 @@ chain length = 2: 1 object
 		}
 
 		if expectedObj.Type.String() != object.PatchedType().String() {
-			t.Errorf("Expected Type.String() %s and received %s", expectedObj.Type.String(), object.Type)
+			t.Errorf("Expected Type.String() %s and received %s", expectedObj.Type.String(), object.Type())
 		}
 		if expectedObj.Size != object.Size {
 			t.Errorf("Expected Size %d and received %d", expectedObj.Size, object.Size)
