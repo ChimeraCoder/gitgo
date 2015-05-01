@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -34,6 +35,23 @@ func (p *packObject) Type() string {
 	return p._type.String()
 }
 
+// normalize returns a GitObject equivalent to the packObject.
+// packObject satisfies the GitObject interface, but if the pack
+// object type is a commit, tree, or blob, it will return a Commit,
+// Tree, or Blob struct instead of the packObject
+func (p *packObject) normalize(basedir string) (GitObject, error) {
+	switch p._type {
+	case OBJ_COMMIT:
+		return p.Commit(basedir)
+	case OBJ_TREE:
+		return p.Tree(basedir)
+	case OBJ_BLOB:
+		return p.Blob(basedir)
+	default:
+		return p, nil
+	}
+}
+
 // Commit returns a Commit struct for the packObject.
 func (p *packObject) Commit(basedir string) (Commit, error) {
 	if p._type != OBJ_COMMIT {
@@ -45,6 +63,32 @@ func (p *packObject) Commit(basedir string) (Commit, error) {
 
 	commit, err := parseCommit(bytes.NewReader(p.PatchedData), basedir)
 	return commit, err
+}
+
+// Tree returns a Tree struct for the packObject.
+func (p *packObject) Tree(basedir string) (Tree, error) {
+	if p._type != OBJ_TREE {
+		return Tree{}, fmt.Errorf("pack object is not a tree: %s", p.Type())
+	}
+	if p.PatchedData == nil {
+		p.PatchedData = p.Data
+	}
+
+	tree, err := parseTree(bytes.NewReader(p.PatchedData), strconv.Itoa(p.Size), basedir)
+	return tree, err
+}
+
+// Blob returns a Blob struct for the packObject.
+func (p *packObject) Blob(basedir string) (Blob, error) {
+	if p._type != OBJ_BLOB {
+		return Blob{}, fmt.Errorf("pack object is not a blob: %s", p.Type())
+	}
+	if p.PatchedData == nil {
+		p.PatchedData = p.Data
+	}
+
+	blob, err := parseBlob(bytes.NewReader(p.PatchedData), basedir)
+	return blob, err
 }
 
 func (p *packObject) Patch(dict map[SHA]*packObject) error {

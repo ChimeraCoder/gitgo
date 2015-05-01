@@ -99,7 +99,7 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 			if err != nil {
 				return nil, err
 			}
-			return obj, nil
+			return obj.normalize(basedir)
 		}
 		return
 	}
