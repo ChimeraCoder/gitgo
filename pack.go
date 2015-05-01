@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -35,10 +34,28 @@ func (p *packObject) Type() string {
 	return p._type.String()
 }
 
+// Commit returns a Commit struct for the packObject.
+func (p *packObject) Commit(basedir string) (Commit, error) {
+	if p._type != OBJ_COMMIT {
+		return Commit{}, fmt.Errorf("pack object is not a commit: %s", p.Type())
+	}
+	if p.PatchedData == nil {
+		p.PatchedData = p.Data
+	}
+	obj, err := parseObj(bytes.NewReader(p.PatchedData), basedir)
+	if err != nil {
+		return Commit{}, err
+	}
+	c, ok := obj.(Commit)
+	if !ok {
+		return Commit{}, fmt.Errorf("expected commit in packfile, received %s (%s)", obj.Type(), p.Name)
+	}
+	return c, nil
+}
+
 func (p *packObject) Patch(dict map[SHA]*packObject) error {
 	if p.Name == "1d833eb5b6c5369c0cb7a4a3e20ded237490145f" {
 		defer func() {
-			log.Printf(" here we go asdf%+v", p)
 		}()
 	}
 	if len(p.PatchedData) != 0 {

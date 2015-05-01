@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -18,6 +19,7 @@ import (
 // or through packfiles
 type GitObject interface {
 	Type() string
+	//Contents() string
 }
 
 type gitObject struct {
@@ -119,6 +121,12 @@ func normalizePerms(perms string) string {
 }
 
 func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
+
+	// TODO this needs to be split up, as packfiles don't contain the header
+	// so the case for "commit" needs to be split into a separate function that
+	// packObject.Commit() can call separately, etc.
+
+	// TODO fixme
 	bts, err := ioutil.ReadAll(r)
 	if err != nil {
 		return result, err
@@ -132,33 +140,9 @@ func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
 	nullIndex := bytes.Index(obj, []byte("\x00"))
 
 	lines := bytes.Split(obj[nullIndex+1:], []byte("\n"))
-
 	switch resultType {
 	case "commit":
-		var commit = Commit{_type: resultType, size: resultSize}
-		for i, line := range lines {
-			// The next line is the commit message
-			if len(bytes.Fields(line)) == 0 {
-				commit.Message = bytes.Join(lines[i+1:], []byte("\n"))
-				break
-			}
-			parts := bytes.Fields(line)
-			key := parts[0]
-			switch keyType(key) {
-			case treeKey:
-				commit.Tree = string(parts[1])
-			case parentKey:
-				commit.Parents = append(commit.Parents, string(parts[1]))
-			case authorKey:
-				commit.Author = string(bytes.Join(parts[1:], []byte(" ")))
-			case committerKey:
-				commit.Committer = string(bytes.Join(parts[1:], []byte(" ")))
-			default:
-				err = fmt.Errorf("encountered unknown field in commit: %s", key)
-				return
-			}
-		}
-		result = commit
+        return parseCommit(bytes.NewReader(obj[nullIndex+1:]), resultSize)
 	case "tree":
 		var tree = Tree{_type: resultType, size: resultSize}
 
@@ -261,4 +245,36 @@ func ScanNullLines(data []byte, atEOF bool) (advance int, token []byte, err erro
 	}
 	// Request more data.
 	return 0, nil, nil
+}
+
+func parseCommit(r io.Reader, resultSize string) (Commit, error) {
+	var commit = Commit{_type: "commit", size: resultSize}
+	bts, err := ioutil.ReadAll(r)
+	if err != nil {
+		return commit, err
+	}
+	lines := bytes.Split(bts, []byte("\n"))
+	for i, line := range lines {
+		// The next line is the commit message
+		if len(bytes.Fields(line)) == 0 {
+			commit.Message = bytes.Join(lines[i+1:], []byte("\n"))
+			break
+		}
+		parts := bytes.Fields(line)
+		key := parts[0]
+		switch keyType(key) {
+		case treeKey:
+			commit.Tree = string(parts[1])
+		case parentKey:
+			commit.Parents = append(commit.Parents, string(parts[1]))
+		case authorKey:
+			commit.Author = string(bytes.Join(parts[1:], []byte(" ")))
+		case committerKey:
+			commit.Committer = string(bytes.Join(parts[1:], []byte(" ")))
+		default:
+			err = fmt.Errorf("encountered unknown field in commit: %s", key)
+			return commit, err
+		}
+	}
+	return commit, nil
 }
