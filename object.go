@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -139,89 +138,14 @@ func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
 	resultSize := string(parts[1])
 	nullIndex := bytes.Index(obj, []byte("\x00"))
 
-	lines := bytes.Split(obj[nullIndex+1:], []byte("\n"))
 	switch resultType {
 	case "commit":
-        return parseCommit(bytes.NewReader(obj[nullIndex+1:]), resultSize)
+		return parseCommit(bytes.NewReader(obj[nullIndex+1:]), resultSize)
 	case "tree":
-		var tree = Tree{_type: resultType, size: resultSize}
+		return parseTree(bytes.NewReader(obj), resultSize, basedir)
 
-		scanner := bufio.NewScanner(bytes.NewBuffer([]byte(obj)))
-		scanner.Split(ScanNullLines)
-
-		var tmp objectMeta
-
-		var resultObjs []objectMeta
-
-		for count := 0; ; count++ {
-			done := !scanner.Scan()
-			if done {
-				break
-			}
-
-			txt := scanner.Text()
-
-			if count == 0 {
-				// the first time through, scanner.Text() will be
-				// "tree <size>"
-				continue
-			}
-			if count == 1 {
-				// the second time through, scanner.Text() will be
-				// <perms> <filename>
-				// separated by a space
-				fields := strings.Fields(txt)
-				tmp.Perms = normalizePerms(fields[0])
-				tmp.filename = fields[1]
-				continue
-			}
-
-			// after the second time through, scanner.Text() will be
-			// <sha><perms2> <file2>
-			// where perms2 and file2 refer to the permissions and filename (respectively)
-			// of the NEXT object, and <sha> is the first 20 bytes exactly.
-			// If there is no next object (this is the last object)
-			// then scanner.Text() will yield exactly 20 bytes.
-
-			// decode the next 20 bytes to get the SHA
-			tmp.Hash = SHA(hex.EncodeToString([]byte(txt[:20])))
-			resultObjs = append(resultObjs, tmp)
-			if len(txt) <= 20 {
-				// We've read the last line
-				break
-			}
-
-			// Now, tmp points to the next object in the tree listing
-			tmp = objectMeta{}
-			remainder := txt[20:]
-			fields := strings.Fields(remainder)
-			tmp.Perms = normalizePerms(fields[0])
-			tmp.filename = fields[1]
-		}
-
-		if err := scanner.Err(); err != nil && err != io.EOF {
-			return tree, err
-		}
-
-		for _, part := range resultObjs {
-			obj, err := NewObject(part.Hash, basedir)
-			if err != nil {
-				return tree, err
-			}
-			switch obj.Type() {
-			case "tree":
-				tree.Trees = append(tree.Trees, part)
-			case "blob":
-				tree.Blobs = append(tree.Blobs, part)
-			default:
-				return tree, fmt.Errorf("Unknown type found: %s", obj.Type())
-			}
-		}
-		result = tree
 	case "blob":
-		var blob = Blob{_type: resultType, size: resultSize}
-		blob.Contents = obj[nullIndex+1:]
-		result = blob
+		return parseBlob(bytes.NewReader(obj[nullIndex+1:]), resultSize)
 	default:
 		err = fmt.Errorf("Received unknown object type %s", resultType)
 	}
@@ -277,4 +201,88 @@ func parseCommit(r io.Reader, resultSize string) (Commit, error) {
 		}
 	}
 	return commit, nil
+}
+
+func parseTree(r io.Reader, resultSize string, basedir string) (Tree, error) {
+	var tree = Tree{_type: "tree", size: resultSize}
+
+	scanner := bufio.NewScanner(r)
+	scanner.Split(ScanNullLines)
+
+	var tmp objectMeta
+
+	var resultObjs []objectMeta
+
+	for count := 0; ; count++ {
+		done := !scanner.Scan()
+		if done {
+			break
+		}
+
+		txt := scanner.Text()
+
+		if count == 0 {
+			// the first time through, scanner.Text() will be
+			// "tree <size>"
+			continue
+		}
+		if count == 1 {
+			// the second time through, scanner.Text() will be
+			// <perms> <filename>
+			// separated by a space
+			fields := strings.Fields(txt)
+			tmp.Perms = normalizePerms(fields[0])
+			tmp.filename = fields[1]
+			continue
+		}
+
+		// after the second time through, scanner.Text() will be
+		// <sha><perms2> <file2>
+		// where perms2 and file2 refer to the permissions and filename (respectively)
+		// of the NEXT object, and <sha> is the first 20 bytes exactly.
+		// If there is no next object (this is the last object)
+		// then scanner.Text() will yield exactly 20 bytes.
+
+		// decode the next 20 bytes to get the SHA
+		tmp.Hash = SHA(hex.EncodeToString([]byte(txt[:20])))
+		resultObjs = append(resultObjs, tmp)
+		if len(txt) <= 20 {
+			// We've read the last line
+			break
+		}
+
+		// Now, tmp points to the next object in the tree listing
+		tmp = objectMeta{}
+		remainder := txt[20:]
+		fields := strings.Fields(remainder)
+		tmp.Perms = normalizePerms(fields[0])
+		tmp.filename = fields[1]
+	}
+
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return tree, err
+	}
+
+	for _, part := range resultObjs {
+		obj, err := NewObject(part.Hash, basedir)
+		if err != nil {
+			return tree, err
+		}
+		switch obj.Type() {
+		case "tree":
+			tree.Trees = append(tree.Trees, part)
+		case "blob":
+			tree.Blobs = append(tree.Blobs, part)
+		default:
+			return tree, fmt.Errorf("Unknown type found: %s", obj.Type())
+		}
+	}
+	return tree, nil
+}
+
+func parseBlob(r io.Reader, resultSize string) (Blob, error) {
+	var blob = Blob{_type: "blob", size: resultSize}
+	bts, err := ioutil.ReadAll(r)
+	blob.Contents = bts
+	return blob, err
 }
