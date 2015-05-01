@@ -1,5 +1,7 @@
-gitgo [![Build Status](https://travis-ci.org/ChimeraCoder/gitgo.svg?branch=master)](https://travis-ci.org/ChimeraCoder/gitgo)
+gitgo 
 ========
+[![GoDoc](https://godoc.org/github.com/ChimeraCoder/gitgo?status.svg)](https://godoc.org/github.com/ChimeraCoder/gitgo)
+[![Build Status](https://travis-ci.org/ChimeraCoder/gitgo.svg?branch=master)](https://travis-ci.org/ChimeraCoder/gitgo)
 
 
 Gitgo is a pure Go implementation of basic git functions.
