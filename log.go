@@ -5,7 +5,7 @@ import "fmt"
 func Log(name SHA, basedir string) ([]Commit, error) {
 	obj, err := NewObject(name, basedir)
 	if err != nil {
-		return nil, fmt.Errorf("commit not found")
+		return nil, fmt.Errorf("commit not found: %s", err)
 	}
 
 	var commit Commit

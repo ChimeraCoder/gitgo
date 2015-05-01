@@ -183,10 +183,9 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				}
 			}
 			zr.Close()
+			object.Data = object.Data[:n]
 
-			if n != objectSize {
-				return nil, fmt.Errorf("expected to read %d bytes, read %d", objectSize, n)
-			}
+			// TODO figure out why sometimes n < objectSize
 
 		case object._type == OBJ_OFS_DELTA:
 			// read the n-byte offset

@@ -88,7 +88,7 @@ type objectMeta struct {
 
 func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 	if basedir == "" {
-		basedir = "."
+		basedir = ".git"
 	}
 
 	filename := path.Join(basedir, "objects", string(input[:2]), string(input[2:]))

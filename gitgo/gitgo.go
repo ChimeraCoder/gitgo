@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -21,6 +23,17 @@ func main() {
 		}
 		io.Copy(os.Stdout, result)
 
+	case "log":
+		hash := gitgo.SHA(args[2])
+		commits, err := gitgo.Log(hash, "")
+		if err != nil {
+			log.Fatal(err)
+		}
+		b := bytes.NewBuffer(nil)
+		for _, commit := range commits {
+			fmt.Fprintf(b, "commit: %s\n%s\n\n", commit.Name, commit.Message)
+		}
+		io.Copy(os.Stdout, b)
 	default:
 		log.Fatalf("no such command: %s", module)
 	}
