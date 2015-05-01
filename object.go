@@ -54,7 +54,7 @@ func (b Blob) Type() string {
 type Commit struct {
 	_type     string
 	Tree      string
-	Parents   []string
+	Parents   []SHA
 	Author    string
 	Committer string
 	Message   []byte
@@ -120,11 +120,6 @@ func normalizePerms(perms string) string {
 }
 
 func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
-
-	// TODO this needs to be split up, as packfiles don't contain the header
-	// so the case for "commit" needs to be split into a separate function that
-	// packObject.Commit() can call separately, etc.
-
 	// TODO fixme
 	bts, err := ioutil.ReadAll(r)
 	if err != nil {
@@ -190,7 +185,7 @@ func parseCommit(r io.Reader, resultSize string) (Commit, error) {
 		case treeKey:
 			commit.Tree = string(parts[1])
 		case parentKey:
-			commit.Parents = append(commit.Parents, string(parts[1]))
+			commit.Parents = append(commit.Parents, SHA(string(parts[1])))
 		case authorKey:
 			commit.Author = string(bytes.Join(parts[1:], []byte(" ")))
 		case committerKey:

@@ -76,7 +76,7 @@ func Test_parseObjTreeCommit(t *testing.T) {
 	expected := Commit{
 		_type:     "commit",
 		Tree:      "d22fc8a57073fdecae2001d00aff921440d3aabd",
-		Parents:   []string{"1d833eb5b6c5369c0cb7a4a3e20ded237490145f"},
+		Parents:   []SHA{"1d833eb5b6c5369c0cb7a4a3e20ded237490145f"},
 		Author:    "aditya <dev@chimeracoder.net> 1428349896 -0400",
 		Committer: "aditya <dev@chimeracoder.net> 1428349896 -0400",
 		Message:   []byte("Remove extraneous logging statements\n"),

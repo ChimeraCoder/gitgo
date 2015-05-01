@@ -42,15 +42,9 @@ func (p *packObject) Commit(basedir string) (Commit, error) {
 	if p.PatchedData == nil {
 		p.PatchedData = p.Data
 	}
-	obj, err := parseObj(bytes.NewReader(p.PatchedData), basedir)
-	if err != nil {
-		return Commit{}, err
-	}
-	c, ok := obj.(Commit)
-	if !ok {
-		return Commit{}, fmt.Errorf("expected commit in packfile, received %s (%s)", obj.Type(), p.Name)
-	}
-	return c, nil
+
+	commit, err := parseCommit(bytes.NewReader(p.PatchedData), basedir)
+	return commit, err
 }
 
 func (p *packObject) Patch(dict map[SHA]*packObject) error {
