@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -35,7 +36,12 @@ func (p *packObject) Type() string {
 }
 
 func (p *packObject) Patch(dict map[SHA]*packObject) error {
-	if p.PatchedData != nil {
+	if p.Name == "1d833eb5b6c5369c0cb7a4a3e20ded237490145f" {
+		defer func() {
+			log.Printf(" here we go asdf%+v", p)
+		}()
+	}
+	if len(p.PatchedData) != 0 {
 		return nil
 	}
 	if p._type < OBJ_OFS_DELTA {
@@ -137,6 +143,7 @@ func objInPacks(packs []SHA, object SHA, basedir string) (*packObject, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		for _, obj := range objs {
 			if obj.Name == object {
 				return obj, nil

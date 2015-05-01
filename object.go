@@ -28,7 +28,7 @@ type gitObject struct {
 	Parents   []string
 	Author    string
 	Committer string
-	Message   string
+	Message   []byte
 	Size      string
 
 	// Tree
@@ -36,14 +36,14 @@ type gitObject struct {
 	Trees []objectMeta
 
 	// Blob
-	Contents string
+	Contents []byte
 }
 
 // A Blob compresses content from a file
 type Blob struct {
 	_type    string
 	size     string
-	Contents string
+	Contents []byte
 }
 
 func (b Blob) Type() string {
@@ -56,7 +56,7 @@ type Commit struct {
 	Parents   []string
 	Author    string
 	Committer string
-	Message   string
+	Message   []byte
 	size      string
 }
 
@@ -123,36 +123,36 @@ func parseObj(r io.Reader, basedir string) (result GitObject, err error) {
 	if err != nil {
 		return result, err
 	}
-	obj := string(bts)
+	obj := bts
 
-	parts := strings.Split(obj, "\x00")
-	parts = strings.Fields(parts[0])
-	resultType := parts[0]
-	resultSize := parts[1]
-	nullIndex := strings.Index(obj, "\x00")
+	parts := bytes.Split(obj, []byte("\x00"))
+	parts = bytes.Fields(parts[0])
+	resultType := string(parts[0])
+	resultSize := string(parts[1])
+	nullIndex := bytes.Index(obj, []byte("\x00"))
 
-	lines := strings.Split(obj[nullIndex+1:], "\n")
+	lines := bytes.Split(obj[nullIndex+1:], []byte("\n"))
 
 	switch resultType {
 	case "commit":
 		var commit = Commit{_type: resultType, size: resultSize}
 		for i, line := range lines {
 			// The next line is the commit message
-			if len(strings.Fields(line)) == 0 {
-				commit.Message = strings.Join(lines[i+1:], "\n")
+			if len(bytes.Fields(line)) == 0 {
+				commit.Message = bytes.Join(lines[i+1:], []byte("\n"))
 				break
 			}
-			parts := strings.Fields(line)
+			parts := bytes.Fields(line)
 			key := parts[0]
 			switch keyType(key) {
 			case treeKey:
-				commit.Tree = parts[1]
+				commit.Tree = string(parts[1])
 			case parentKey:
-				commit.Parents = append(commit.Parents, parts[1])
+				commit.Parents = append(commit.Parents, string(parts[1]))
 			case authorKey:
-				commit.Author = strings.Join(parts[1:], " ")
+				commit.Author = string(bytes.Join(parts[1:], []byte(" ")))
 			case committerKey:
-				commit.Committer = strings.Join(parts[1:], " ")
+				commit.Committer = string(bytes.Join(parts[1:], []byte(" ")))
 			default:
 				err = fmt.Errorf("encountered unknown field in commit: %s", key)
 				return

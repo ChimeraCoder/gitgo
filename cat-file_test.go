@@ -48,7 +48,7 @@ func Test_parseObjInitialCommit(t *testing.T) {
 		Parents:   nil,
 		Author:    "aditya <dev@chimeracoder.net> 1428075900 -0400",
 		Committer: "aditya <dev@chimeracoder.net> 1428075900 -0400",
-		Message:   "First commit. Create .gitignore",
+		Message:   []byte("First commit. Create .gitignore"),
 		size:      "190",
 	}
 
@@ -79,7 +79,7 @@ func Test_parseObjTreeCommit(t *testing.T) {
 		Parents:   []string{"1d833eb5b6c5369c0cb7a4a3e20ded237490145f"},
 		Author:    "aditya <dev@chimeracoder.net> 1428349896 -0400",
 		Committer: "aditya <dev@chimeracoder.net> 1428349896 -0400",
-		Message:   "Remove extraneous logging statements\n",
+		Message:   []byte("Remove extraneous logging statements\n"),
 		size:      "243",
 	}
 
@@ -123,7 +123,7 @@ func Test_ParseBlob(t *testing.T) {
 	expected := Blob{
 		_type:    "blob",
 		size:     "18",
-		Contents: "*.swp\n*.swo\n*.swn\n",
+		Contents: []byte("*.swp\n*.swo\n*.swn\n"),
 	}
 	result, err := NewObject(inputSha, RepoDir)
 	if err != nil {
