@@ -283,3 +283,54 @@ func parseBlob(r io.Reader, resultSize string) (Blob, error) {
 	blob.Contents = bts
 	return blob, err
 }
+
+func findFromPrefix(prefix SHA, basedir string) (GitObject, error) {
+	objectsDir := path.Join(basedir, "objects", string(prefix[:2]))
+	files, err := ioutil.ReadDir(objectsDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
+	file, err := findUniquePrefix(prefix, files)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+
+		// Try the packfile
+		obj, err := searchPacks(prefix, basedir)
+		if err != nil {
+			return nil, err
+		}
+		return obj.normalize(basedir)
+	}
+	f, err := os.Open(file.Name())
+	defer f.Close()
+	r, err := zlib.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	return parseObj(r, prefix, basedir)
+
+}
+
+func findUniquePrefix(prefix SHA, files []os.FileInfo) (os.FileInfo, error) {
+	var result os.FileInfo
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		if strings.HasPrefix(file.Name(), string(prefix)) {
+			if result != nil {
+				return nil, fmt.Errorf("prefix is not unique: %s", prefix)
+			}
+			result = file
+		}
+	}
+	if result == nil {
+		return nil, os.ErrNotExist
+	}
+	return result, nil
+}
