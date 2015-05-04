@@ -93,8 +93,8 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 
 	if path.Base(basedir) != ".git" {
 		var candidate string
+		candidate = path.Join(basedir, ".git")
 		for {
-			candidate = path.Join(basedir, ".git")
 			_, err := os.Stat(candidate)
 			if err == nil {
 				basedir = candidate
@@ -111,7 +111,7 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 			if candidate == "/" {
 				return nil, fmt.Errorf("not a git repository (or any parent up to root /")
 			}
-			candidate = path.Clean(path.Join(candidate, ".."))
+			candidate = path.Clean(path.Join(candidate, "..", "..", ".git"))
 		}
 	}
 

@@ -195,3 +195,14 @@ func Test_NakedDirectory(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func Test_Subdirectory(t *testing.T) {
+	// Test that we can read a subdirectory of a git repo
+
+	dir := path.Clean(path.Join(RepoDir, "..", "subdir"))
+	const inputSHA SHA = "254671773e8cd91e07e36546c9a2d9c27e8dfeec"
+	_, err := NewObject(inputSHA[:15], dir)
+	if err != nil {
+		t.Error(err)
+	}
+}
