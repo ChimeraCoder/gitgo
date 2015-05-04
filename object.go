@@ -91,18 +91,48 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 		basedir = ".git"
 	}
 
-	filename := path.Join(basedir, "objects", string(input[:2]), string(input[2:]))
+	if len(input) < 4 {
+		return nil, fmt.Errorf("input SHA must be at least 4 characters")
+	}
 
-	f, err := os.Open(filename)
+	filename := path.Join(basedir, "objects", string(input[:2]), string(input[2:]))
+	_, err = os.Stat(filename)
 	if err != nil {
-		if os.IsNotExist(err) {
-			obj, err := searchPacks(input, basedir)
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+
+		// check the directory for a file with the SHA as a prefix
+		_, err = os.Stat(path.Join(basedir, "objects", string(input[:2])))
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+		} else {
+			dirname := path.Join(basedir, "objects", string(input[:2]))
+			files, err := ioutil.ReadDir(dirname)
 			if err != nil {
 				return nil, err
 			}
-			return obj.normalize(basedir)
+			for _, file := range files {
+				if strings.HasPrefix(file.Name(), string(input[2:])) {
+					return objectFromFile(path.Join(dirname, file.Name()), input, basedir)
+				}
+			}
 		}
-		return
+
+		// try the packfile
+		obj, err := searchPacks(input, basedir)
+		if err != nil {
+			return nil, err
+		}
+		return obj.normalize(basedir)
+
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
 	}
 	defer f.Close()
 	r, err := zlib.NewReader(f)
@@ -110,6 +140,20 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 		return nil, err
 	}
 	return parseObj(r, input, basedir)
+
+}
+
+func objectFromFile(filename string, name SHA, basedir string) (GitObject, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	r, err := zlib.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	return parseObj(r, name, basedir)
 }
 
 func normalizePerms(perms string) string {

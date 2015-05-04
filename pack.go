@@ -200,7 +200,7 @@ func objInPacks(packs []SHA, object SHA, basedir string) (*packObject, error) {
 		}
 
 		for _, obj := range objs {
-			if obj.Name == object {
+			if strings.HasPrefix(string(obj.Name), string(object)) {
 				return obj, nil
 			}
 		}
