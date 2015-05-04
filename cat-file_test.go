@@ -4,13 +4,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path"
 	"reflect"
 	"strings"
 	"testing"
 )
-
-var RepoDir = path.Join("test_data", "dot_git")
 
 func ReadAll(t *testing.T, r io.Reader) []byte {
 	bts, err := ioutil.ReadAll(r)
