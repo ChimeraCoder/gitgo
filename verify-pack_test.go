@@ -96,8 +96,8 @@ chain length = 2: 1 object
 			log.Printf("%+v", object.err)
 			t.Errorf("error reading object %s: %s", object.Name, object.err)
 		}
-		if expectedObj.Type.String() != object.Type() && object.Type() != OBJ_OFS_DELTA.String() {
-			t.Errorf("expected type %s and received type %s", expectedObj.Type, object.Type())
+		if expectedObj.Type.String() != object._type.String() && object._type.String() != OBJ_OFS_DELTA.String() {
+			t.Errorf("expected type %s and received type %s", expectedObj.Type, object._type.String())
 		}
 
 		if expectedObj.Name != object.Name {

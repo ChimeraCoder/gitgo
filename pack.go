@@ -32,7 +32,16 @@ type packObject struct {
 }
 
 func (p *packObject) Type() string {
-	return p._type.String()
+	switch p.BaseObjectType {
+	case OBJ_COMMIT:
+		return "commit"
+	case OBJ_TREE:
+		return "tree"
+	case OBJ_BLOB:
+		return "blob"
+	default:
+		return p.BaseObjectType.String()
+	}
 }
 
 // normalize returns a GitObject equivalent to the packObject.

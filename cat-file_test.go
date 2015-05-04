@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
@@ -178,6 +179,18 @@ func Test_ParsePrefixPackfile(t *testing.T) {
 	// in the test directory, this is stored in a packfile
 	const inputSHA SHA = "b45377f6daf59a4cec9e8de64f5df1533a7994cd"
 	_, err := NewObject(inputSHA[:15], RepoDir)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func Test_NakedDirectory(t *testing.T) {
+	// Test that we can read a "naked" directory
+	// (ie, without the .git extension)
+
+	dir := path.Clean(path.Join(RepoDir, ".."))
+	const inputSHA SHA = "254671773e8cd91e07e36546c9a2d9c27e8dfeec"
+	_, err := NewObject(inputSHA[:15], dir)
 	if err != nil {
 		t.Error(err)
 	}

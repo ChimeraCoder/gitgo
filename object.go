@@ -91,6 +91,30 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 		basedir = ".git"
 	}
 
+	if path.Base(basedir) != ".git" {
+		var candidate string
+		for {
+			candidate = path.Join(basedir, ".git")
+			_, err := os.Stat(candidate)
+			if err == nil {
+				basedir = candidate
+				break
+			}
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+
+			// This should not be the main condition of the for loop
+			// just in case the filesystem root directory contains
+			// a .git subdirectory
+			// TODO check for mountpoint
+			if candidate == "/" {
+				return nil, fmt.Errorf("not a git repository (or any parent up to root /")
+			}
+			candidate = path.Clean(path.Join(candidate, ".."))
+		}
+	}
+
 	if len(input) < 4 {
 		return nil, fmt.Errorf("input SHA must be at least 4 characters")
 	}
@@ -309,6 +333,14 @@ func parseTree(r io.Reader, resultSize string, basedir string) (Tree, error) {
 		if err != nil {
 			return tree, err
 		}
+
+		if o, ok := obj.(*packObject); ok {
+			obj, err = o.normalize(basedir)
+			if err != nil {
+				return tree, err
+			}
+		}
+
 		switch obj.Type() {
 		case "tree":
 			tree.Trees = append(tree.Trees, part)
