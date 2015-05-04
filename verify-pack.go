@@ -61,11 +61,8 @@ func VerifyPack(pack io.ReadSeeker, idx io.Reader) ([]*packObject, error) {
 	}
 
 	for _, object := range objectsMap {
-		if object._type == OBJ_OFS_DELTA {
 
-			object.err = object.Patch(objectsMap)
-
-		}
+		object.err = object.Patch(objectsMap)
 	}
 	return objects, err
 }

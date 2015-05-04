@@ -101,10 +101,6 @@ func (p *packObject) Blob(basedir string) (Blob, error) {
 }
 
 func (p *packObject) Patch(dict map[SHA]*packObject) error {
-	if p.Name == "1d833eb5b6c5369c0cb7a4a3e20ded237490145f" {
-		defer func() {
-		}()
-	}
 	if len(p.PatchedData) != 0 {
 		return nil
 	}
