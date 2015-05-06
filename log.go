@@ -3,6 +3,24 @@ package gitgo
 import "fmt"
 
 func Log(name SHA, basedir string) ([]Commit, error) {
+	as, err := allAncestors(name, basedir)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := NewObject(name, basedir)
+	if err != nil {
+		return nil, fmt.Errorf("commit not found: %s", err)
+	}
+	result := make([]Commit, len(as)+1)
+	result[0] = obj.(Commit)
+	for i, o := range as {
+		result[i+1] = o
+	}
+	return result, nil
+}
+
+func allAncestors(name SHA, basedir string) ([]Commit, error) {
 	obj, err := NewObject(name, basedir)
 	if err != nil {
 		return nil, fmt.Errorf("commit not found: %s", err)
@@ -35,7 +53,7 @@ func Log(name SHA, basedir string) ([]Commit, error) {
 		}
 
 		parents = append(parents, parent)
-		ancestors, err := Log(SHA(commit.Parents[0]), basedir)
+		ancestors, err := allAncestors(SHA(commit.Parents[0]), basedir)
 		if err != nil {
 			return parents, err
 		}
