@@ -24,7 +24,7 @@ Full documentation is available on [GoDoc](https://godoc.org/github.com/ChimeraC
 
 Gitgo is a library intended to be used by other applications, rather than a replacement for the `git` command-line tools. However, gitgo does provide the `gitgo` binary, which is used for testing the gitgo library functions and demonstrating their functionality:
 
-`
+````
 $ cd $GOPATH/src/github.com/ChimeraCoder/gitgo
 $ gitgo log 1d833eb5b6c5369c0cb7a4a3e20ded237490145f
 
@@ -37,6 +37,6 @@ Add CatFile function and corresponding test
 
 commit: 97eed02ebe122df8fdd853c1215d8775f3d9f1a1
 First commit. Create .gitignore
-`
+````
 
 Note that the `gitgo` binary does not support all (or even most) of the functions provided by the gitgo library; it is intended for demonstration purposes and testing only.
