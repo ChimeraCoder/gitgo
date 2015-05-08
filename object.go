@@ -87,32 +87,30 @@ type objectMeta struct {
 }
 
 func NewObject(input SHA, basedir string) (obj GitObject, err error) {
-	if basedir == "" {
-		basedir = ".git"
+	if path.Base(basedir) != ".git" {
+		basedir = path.Join(basedir, ".git")
 	}
 
-	if path.Base(basedir) != ".git" {
-		var candidate string
-		candidate = path.Join(basedir, ".git")
-		for {
-			_, err := os.Stat(candidate)
-			if err == nil {
-				basedir = candidate
-				break
-			}
-			if !os.IsNotExist(err) {
-				return nil, err
-			}
-
-			// This should not be the main condition of the for loop
-			// just in case the filesystem root directory contains
-			// a .git subdirectory
-			// TODO check for mountpoint
-			if candidate == "/" {
-				return nil, fmt.Errorf("not a git repository (or any parent up to root /")
-			}
-			candidate = path.Clean(path.Join(candidate, "..", "..", ".git"))
+	candidate := basedir
+	for {
+		_, err := os.Stat(candidate)
+		if err == nil {
+			basedir = candidate
+			break
 		}
+		if !os.IsNotExist(err) {
+			panic(err)
+			return nil, err
+		}
+
+		// This should not be the main condition of the for loop
+		// just in case the filesystem root directory contains
+		// a .git subdirectory
+		// TODO check for mountpoint
+		if candidate == "/" {
+			return nil, fmt.Errorf("not a git repository (or any parent up to root /")
+		}
+		candidate = path.Join(candidate, "..", "..", ".git")
 	}
 
 	if len(input) < 4 {
