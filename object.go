@@ -10,7 +10,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // GitObject represents a commit, tree, or blob.
@@ -408,4 +410,50 @@ func findUniquePrefix(prefix SHA, files []os.FileInfo) (os.FileInfo, error) {
 		return nil, os.ErrNotExist
 	}
 	return result, nil
+}
+
+func parseAuthorString(str string) (author string, date time.Time, err error) {
+	const layout = "Mon Jan _2 15:04:05 2006 -0700"
+	var authorW bytes.Buffer
+	var emailW bytes.Buffer
+	var dateW bytes.Buffer
+
+	s := bufio.NewScanner(strings.NewReader(str))
+	s.Split(bufio.ScanBytes)
+
+	// git will ignore '<' if it appears in an author's name
+	// so we can safely use it as a delimiter
+	for s.Scan() {
+		text := s.Text()
+		if text == "<" {
+			emailW.Write(s.Bytes())
+			break
+		}
+		authorW.Write(s.Bytes())
+	}
+
+	for s.Scan() {
+		text := s.Text()
+		emailW.Write(s.Bytes())
+		if text == ">" {
+			break
+		}
+	}
+	for s.Scan() {
+		dateW.Write(s.Bytes())
+	}
+	if s.Err() != nil {
+		err = s.Err()
+		return
+	}
+
+	timestamp, err := strconv.Atoi(strings.Fields(dateW.String())[0])
+	if err != nil {
+		return
+	}
+	timezone := strings.Fields(dateW.String())[1]
+	t := time.Unix(int64(timestamp), 0)
+	date, err = time.Parse(layout, fmt.Sprintf("%s %s", t.Format(time.ANSIC), timezone))
+
+	return strings.TrimSpace(authorW.String()), date, err
 }

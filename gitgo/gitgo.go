@@ -12,7 +12,6 @@ import (
 
 func main() {
 	args := os.Args
-
 	module := args[1]
 	switch module {
 	case "cat-file":
