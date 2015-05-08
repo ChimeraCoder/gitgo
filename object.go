@@ -99,7 +99,6 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 			break
 		}
 		if !os.IsNotExist(err) {
-			panic(err)
 			return nil, err
 		}
 
