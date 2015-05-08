@@ -49,7 +49,7 @@ func allAncestors(name SHA, basedir string) ([]Commit, error) {
 		}
 		parent, ok := obj.(Commit)
 		if !ok {
-			return nil, fmt.Errorf("receved non-commit object parent: %", commit.Parents[0])
+			return nil, fmt.Errorf("receved non-commit object parent: %s", commit.Parents[0])
 		}
 
 		parents = append(parents, parent)
