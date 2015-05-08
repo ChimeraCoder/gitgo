@@ -4,4 +4,39 @@ gitgo
 [![Build Status](https://travis-ci.org/ChimeraCoder/gitgo.svg?branch=master)](https://travis-ci.org/ChimeraCoder/gitgo)
 
 
-Gitgo is a pure Go implementation of basic git functions.
+Gitgo provides functions for interacting with Go repositories. 
+
+Unlike libgit2, which is written in C, Gitgo is written in pure Go, and can be compiled and cross-compiled easily for all platforms supported by Go.
+
+
+Installation
+--------------
+
+`
+$ go get github.com/ChimeraCoder/gitgo
+`
+
+
+Usage
+---------
+
+Full documentation is available on [GoDoc](https://godoc.org/github.com/ChimeraCoder/gitgo).
+
+Gitgo is a library intended to be used by other applications, rather than a replacement for the `git` command-line tools. However, gitgo does provide the `gitgo` binary, which is used for testing the gitgo library functions and demonstrating their functionality:
+
+`
+$ cd $GOPATH/src/github.com/ChimeraCoder/gitgo
+$ gitgo log 1d833eb5b6c5369c0cb7a4a3e20ded237490145f
+
+Parse git object into struct and add corresponding test
+
+
+commit: a7f92c920ce85f07a33f948aa4fa2548b270024f
+Add CatFile function and corresponding test
+
+
+commit: 97eed02ebe122df8fdd853c1215d8775f3d9f1a1
+First commit. Create .gitignore
+`
+
+Note that the `gitgo` binary does not support all (or even most) of the functions provided by the gitgo library; it is intended for demonstration purposes and testing only.
