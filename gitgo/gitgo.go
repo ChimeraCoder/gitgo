@@ -31,7 +31,7 @@ func main() {
 		}
 		b := bytes.NewBuffer(nil)
 		for _, commit := range commits {
-			fmt.Fprintf(b, "commit: %s\n%s\n\n", commit.Name, commit.Message)
+			fmt.Fprintf(b, "commit: %s\n%s%s\n\n\n", commit.Name, commit.Author, commit.Message)
 		}
 		io.Copy(os.Stdout, b)
 	default:

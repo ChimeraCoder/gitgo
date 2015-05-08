@@ -1,6 +1,9 @@
 package gitgo
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 func Log(name SHA, basedir string) ([]Commit, error) {
 	as, err := allAncestors(name, basedir)
@@ -49,7 +52,8 @@ func allAncestors(name SHA, basedir string) ([]Commit, error) {
 		}
 		parent, ok := obj.(Commit)
 		if !ok {
-			return nil, fmt.Errorf("receved non-commit object parent: %s", commit.Parents[0])
+			fmt.Println(reflect.TypeOf(obj))
+			return nil, fmt.Errorf("receved non-commit object parent: %s (%s)", commit.Parents[0], obj.Type())
 		}
 
 		parents = append(parents, parent)

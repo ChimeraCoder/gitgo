@@ -45,6 +45,7 @@ type Blob struct {
 	_type    string
 	size     string
 	Contents []byte
+	rawData  []byte
 }
 
 func (b Blob) Type() string {
@@ -60,6 +61,7 @@ type Commit struct {
 	Committer string
 	Message   []byte
 	size      string
+	rawData   []byte
 }
 
 func (c Commit) Type() string {

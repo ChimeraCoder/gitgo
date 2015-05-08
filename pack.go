@@ -49,7 +49,7 @@ func (p *packObject) Type() string {
 // object type is a commit, tree, or blob, it will return a Commit,
 // Tree, or Blob struct instead of the packObject
 func (p *packObject) normalize(basedir string) (GitObject, error) {
-	switch p._type {
+	switch p.BaseObjectType {
 	case OBJ_COMMIT:
 		return p.Commit(basedir)
 	case OBJ_TREE:
@@ -63,7 +63,7 @@ func (p *packObject) normalize(basedir string) (GitObject, error) {
 
 // Commit returns a Commit struct for the packObject.
 func (p *packObject) Commit(basedir string) (Commit, error) {
-	if p._type != OBJ_COMMIT {
+	if p.BaseObjectType != OBJ_COMMIT {
 		return Commit{}, fmt.Errorf("pack object is not a commit: %s", p.Type())
 	}
 	if p.PatchedData == nil {
@@ -71,12 +71,13 @@ func (p *packObject) Commit(basedir string) (Commit, error) {
 	}
 
 	commit, err := parseCommit(bytes.NewReader(p.PatchedData), strconv.Itoa(p.Size), p.Name)
+	commit.rawData = p.PatchedData
 	return commit, err
 }
 
 // Tree returns a Tree struct for the packObject.
 func (p *packObject) Tree(basedir string) (Tree, error) {
-	if p._type != OBJ_TREE {
+	if p.BaseObjectType != OBJ_TREE {
 		return Tree{}, fmt.Errorf("pack object is not a tree: %s", p.Type())
 	}
 	if p.PatchedData == nil {
@@ -89,7 +90,7 @@ func (p *packObject) Tree(basedir string) (Tree, error) {
 
 // Blob returns a Blob struct for the packObject.
 func (p *packObject) Blob(basedir string) (Blob, error) {
-	if p._type != OBJ_BLOB {
+	if p.BaseObjectType != OBJ_BLOB {
 		return Blob{}, fmt.Errorf("pack object is not a blob: %s", p.Type())
 	}
 	if p.PatchedData == nil {
@@ -97,6 +98,7 @@ func (p *packObject) Blob(basedir string) (Blob, error) {
 	}
 
 	blob, err := parseBlob(bytes.NewReader(p.PatchedData), basedir)
+	blob.rawData = p.PatchedData
 	return blob, err
 }
 

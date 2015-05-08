@@ -146,7 +146,7 @@ func Test_ParsePackfile(t *testing.T) {
 	}
 
 	// TODO remove this type assertion
-	if len(result.(*packObject).PatchedData) != expected {
+	if len(result.(Blob).rawData) != expected {
 		t.Errorf("expected and result don't match")
 	}
 }
