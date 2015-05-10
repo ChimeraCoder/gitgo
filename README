@@ -27,16 +27,24 @@ Gitgo is a library intended to be used by other applications, rather than a repl
 ````
 $ cd $GOPATH/src/github.com/ChimeraCoder/gitgo
 $ gitgo log 1d833eb5b6c5369c0cb7a4a3e20ded237490145f
+commit 1d833eb5b6c5369c0cb7a4a3e20ded237490145f
+Author: aditya <dev@chimeracoder.net>
+Date:   Mon Apr 6 15:49:15 2015 -0400
 
-Parse git object into struct and add corresponding test
+    Parse git object into struct and add corresponding test
+    
+commit a7f92c920ce85f07a33f948aa4fa2548b270024f
+Author: aditya <dev@chimeracoder.net>
+Date:   Fri Apr 3 12:38:24 2015 -0400
 
+    Add CatFile function and corresponding test
+    
+commit 97eed02ebe122df8fdd853c1215d8775f3d9f1a1
+Author: aditya <dev@chimeracoder.net>
+Date:   Fri Apr 3 11:45:00 2015 -0400
 
-commit: a7f92c920ce85f07a33f948aa4fa2548b270024f
-Add CatFile function and corresponding test
+    First commit. Create .gitignore
 
-
-commit: 97eed02ebe122df8fdd853c1215d8775f3d9f1a1
-First commit. Create .gitignore
 ````
 
 Note that the `gitgo` binary does not support all (or even most) of the functions provided by the gitgo library; it is intended for demonstration purposes and testing only.
