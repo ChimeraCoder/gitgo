@@ -425,6 +425,7 @@ func findUniquePrefix(prefix SHA, files []os.FileInfo) (os.FileInfo, error) {
 
 func parseAuthorString(str string) (author string, date time.Time, err error) {
 	const layout = "Mon Jan _2 15:04:05 2006 -0700"
+	const layout2 = "Mon Jan _2 15:04:05 2006"
 	var authorW bytes.Buffer
 	var dateW bytes.Buffer
 
@@ -451,9 +452,16 @@ func parseAuthorString(str string) (author string, date time.Time, err error) {
 	if err != nil {
 		return
 	}
+
+
 	timezone := strings.Fields(dateW.String())[1]
-	t := time.Unix(int64(timestamp), 0)
-	date, err = time.Parse(layout, fmt.Sprintf("%s %s", t.Format(time.ANSIC), timezone))
+
+    hours, err := strconv.Atoi(timezone)
+    if err != nil{
+        return
+    }
+	t := time.Unix(int64(timestamp), 0).In(time.FixedZone("", hours* 60 * 60 / 100))
+	date, err = time.Parse(layout, fmt.Sprintf("%s %s", t.Format(layout2), timezone))
 
 	return strings.TrimSpace(authorW.String()), date, err
 }
