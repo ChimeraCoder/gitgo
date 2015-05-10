@@ -55,15 +55,16 @@ func (b Blob) Type() string {
 }
 
 type Commit struct {
-	_type     string
-	Name      SHA
-	Tree      string
-	Parents   []SHA
-	Author    string
-	Committer string
-	Message   []byte
-	size      string
-	rawData   []byte
+	_type      string
+	Name       SHA
+	Tree       string
+	Parents    []SHA
+	Author     string
+	AuthorDate time.Time
+	Committer  string
+	Message    []byte
+	size       string
+	rawData    []byte
 }
 
 func (c Commit) Type() string {
@@ -257,7 +258,13 @@ func parseCommit(r io.Reader, resultSize string, name SHA) (Commit, error) {
 		case parentKey:
 			commit.Parents = append(commit.Parents, SHA(string(parts[1])))
 		case authorKey:
-			commit.Author = string(bytes.Join(parts[1:], []byte(" ")))
+			authorline := string(bytes.Join(parts[1:], []byte(" ")))
+			author, date, err := parseAuthorString(authorline)
+			if err != nil {
+				return commit, err
+			}
+			commit.Author = author
+			commit.AuthorDate = date
 		case committerKey:
 			commit.Committer = string(bytes.Join(parts[1:], []byte(" ")))
 		default:
@@ -415,7 +422,6 @@ func findUniquePrefix(prefix SHA, files []os.FileInfo) (os.FileInfo, error) {
 func parseAuthorString(str string) (author string, date time.Time, err error) {
 	const layout = "Mon Jan _2 15:04:05 2006 -0700"
 	var authorW bytes.Buffer
-	var emailW bytes.Buffer
 	var dateW bytes.Buffer
 
 	s := bufio.NewScanner(strings.NewReader(str))
@@ -424,18 +430,8 @@ func parseAuthorString(str string) (author string, date time.Time, err error) {
 	// git will ignore '<' if it appears in an author's name
 	// so we can safely use it as a delimiter
 	for s.Scan() {
-		text := s.Text()
-		if text == "<" {
-			emailW.Write(s.Bytes())
-			break
-		}
 		authorW.Write(s.Bytes())
-	}
-
-	for s.Scan() {
-		text := s.Text()
-		emailW.Write(s.Bytes())
-		if text == ">" {
+		if s.Text() == ">" {
 			break
 		}
 	}

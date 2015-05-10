@@ -7,7 +7,7 @@ import (
 
 func Test_parseAuthorString(t *testing.T) {
 	const input = "aditya <dev@chimeracoder.net> 1428349755 -0400"
-	const expectedAuthor = "aditya"
+	const expectedAuthor = "aditya <dev@chimeracoder.net>"
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
 		t.Fatal(err)
