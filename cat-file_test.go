@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"path"
 	"reflect"
 	"strings"
@@ -41,6 +42,10 @@ func ReaderEqual(t *testing.T, r1 io.Reader, expected io.Reader) (err error) {
 }
 
 func Test_parseObjInitialCommit(t *testing.T) {
+	tm, err := time.Parse(RFC2822, "Fri Apr 3 11:45:00 2015 -0400")
+	if err != nil {
+		t.Fatal(err)
+	}
 	const inputSHA = SHA("97eed02ebe122df8fdd853c1215d8775f3d9f1a1")
 	expected := Commit{
 		_type:      "commit",
@@ -48,7 +53,7 @@ func Test_parseObjInitialCommit(t *testing.T) {
 		Tree:       "9de6c72106b169990a83ce7090c7cad84b6b506b",
 		Parents:    nil,
 		Author:     "aditya <dev@chimeracoder.net>",
-		AuthorDate: time.Unix(1428075900, 0),
+		AuthorDate: tm,
 		Committer:  "aditya <dev@chimeracoder.net> 1428075900 -0400",
 		Message:    []byte("First commit. Create .gitignore"),
 		size:       "190",
@@ -68,9 +73,14 @@ First commit. Create .gitignore`
 	if !reflect.DeepEqual(expected, result) {
 		t.Errorf("Expected and result don't match:\n%+v\n%+v", expected, result)
 	}
+	log.Print(reflect.DeepEqual(expected.AuthorDate, result.(Commit).AuthorDate))
 }
 
 func Test_parseObjTreeCommit(t *testing.T) {
+	tm, err := time.Parse(RFC2822, "Mon Apr 6 15:51:36 2015 -0400")
+	if err != nil {
+		t.Fatal(err)
+	}
 	const inputSHA = SHA("3ead3116d0378089f5ce61086354aac43e736b01")
 	const fileContents = "commit 243\x00tree d22fc8a57073fdecae2001d00aff921440d3aabd\nparent 1d833eb5b6c5369c0cb7a4a3e20ded237490145f\nauthor aditya <dev@chimeracoder.net> 1428349896 -0400\ncommitter aditya <dev@chimeracoder.net> 1428349896 -0400\n\nRemove extraneous logging statements\n"
 
@@ -80,7 +90,7 @@ func Test_parseObjTreeCommit(t *testing.T) {
 		Tree:       "d22fc8a57073fdecae2001d00aff921440d3aabd",
 		Parents:    []SHA{"1d833eb5b6c5369c0cb7a4a3e20ded237490145f"},
 		Author:     "aditya <dev@chimeracoder.net>",
-		AuthorDate: time.Unix(1428349896, 0),
+		AuthorDate: tm,
 		Committer:  "aditya <dev@chimeracoder.net> 1428349896 -0400",
 		Message:    []byte("Remove extraneous logging statements\n"),
 		size:       "243",
