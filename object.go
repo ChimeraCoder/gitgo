@@ -15,6 +15,10 @@ import (
 	"time"
 )
 
+const (
+	RFC2822 = "Mon Jan 2 15:04:05 2006 -0700"
+)
+
 // GitObject represents a commit, tree, or blob.
 // Under the hood, these may be objects stored directly
 // or through packfiles

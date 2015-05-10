@@ -30,7 +30,7 @@ func main() {
 		}
 		b := bytes.NewBuffer(nil)
 		for _, commit := range commits {
-			fmt.Fprintf(b, "commit: %s\n%s%s\n\n\n", commit.Name, commit.Author, commit.Message)
+			fmt.Fprintf(b, "commit %s\nAuthor: %s\nDate:   %s\n\n    %s\n", commit.Name, commit.Author, commit.AuthorDate.Format(gitgo.RFC2822), bytes.Replace(commit.Message, []byte("\n"), []byte("\n    "), -1))
 		}
 		io.Copy(os.Stdout, b)
 	default:
