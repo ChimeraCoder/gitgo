@@ -26,3 +26,14 @@ func Test_Log(t *testing.T) {
 		}
 	}
 }
+
+
+// This function reads from the current repository, rather than the
+// test data repository
+func Test_SlowLog(t *testing.T) {
+	const input SHA = "a3dda0b50b190caf79ea5074ed6490f30ea47cef"
+	_, err := Log(input, "")
+	if err != nil {
+        t.Skip("Failed to read %s: %s", input, err)
+	}
+}
