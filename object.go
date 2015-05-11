@@ -59,16 +59,17 @@ func (b Blob) Type() string {
 }
 
 type Commit struct {
-	_type      string
-	Name       SHA
-	Tree       string
-	Parents    []SHA
-	Author     string
-	AuthorDate time.Time
-	Committer  string
-	Message    []byte
-	size       string
-	rawData    []byte
+	_type         string
+	Name          SHA
+	Tree          string
+	Parents       []SHA
+	Author        string
+	AuthorDate    time.Time
+	Committer     string
+	CommitterDate time.Time
+	Message       []byte
+	size          string
+	rawData       []byte
 }
 
 func (c Commit) Type() string {
@@ -270,7 +271,13 @@ func parseCommit(r io.Reader, resultSize string, name SHA) (Commit, error) {
 			commit.Author = author
 			commit.AuthorDate = date
 		case committerKey:
-			commit.Committer = string(bytes.Join(parts[1:], []byte(" ")))
+			committerline := string(bytes.Join(parts[1:], []byte(" ")))
+			committer, date, err := parseCommitterString(committerline)
+			if err != nil {
+				return commit, err
+			}
+			commit.Committer = committer
+			commit.CommitterDate = date
 		default:
 			err = fmt.Errorf("encountered unknown field in commit: %s", key)
 			return commit, err
@@ -423,6 +430,15 @@ func findUniquePrefix(prefix SHA, files []os.FileInfo) (os.FileInfo, error) {
 	return result, nil
 }
 
+// The ommitter string is in the same format as
+// the author string, and oftentimes shares
+// the same value as the author string.
+
+func parseCommitterString(str string) (committer string, date time.Time, err error) {
+	return parseAuthorString(str)
+}
+
+// parseAuthorString parses the author string.
 func parseAuthorString(str string) (author string, date time.Time, err error) {
 	const layout = "Mon Jan _2 15:04:05 2006 -0700"
 	const layout2 = "Mon Jan _2 15:04:05 2006"
@@ -453,14 +469,13 @@ func parseAuthorString(str string) (author string, date time.Time, err error) {
 		return
 	}
 
-
 	timezone := strings.Fields(dateW.String())[1]
 
-    hours, err := strconv.Atoi(timezone)
-    if err != nil{
-        return
-    }
-	t := time.Unix(int64(timestamp), 0).In(time.FixedZone("", hours* 60 * 60 / 100))
+	hours, err := strconv.Atoi(timezone)
+	if err != nil {
+		return
+	}
+	t := time.Unix(int64(timestamp), 0).In(time.FixedZone("", hours*60*60/100))
 	date, err = time.Parse(layout, fmt.Sprintf("%s %s", t.Format(layout2), timezone))
 
 	return strings.TrimSpace(authorW.String()), date, err
