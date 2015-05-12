@@ -162,14 +162,13 @@ func newObject(input SHA, basedir string, packfiles []*packfile) (obj GitObject,
 			if p, ok := pack.objects[input]; ok {
 				return p.normalize(basedir)
 			}
+			for _, object := range pack.objects {
+				if strings.HasPrefix(string(object.Name), string(input)) {
+					return object.normalize(basedir)
+				}
+			}
 		}
-
-		obj, err := searchPacks(input, basedir)
-		if err != nil {
-			return nil, err
-		}
-		return obj.normalize(basedir)
-
+		return nil, fmt.Errorf("object not in any packfile: %s", input)
 	}
 
 	f, err := os.Open(filename)
@@ -388,38 +387,6 @@ func parseBlob(r io.Reader, resultSize string) (Blob, error) {
 	bts, err := ioutil.ReadAll(r)
 	blob.Contents = bts
 	return blob, err
-}
-
-func findFromPrefix(prefix SHA, basedir string) (GitObject, error) {
-	objectsDir := path.Join(basedir, "objects", string(prefix[:2]))
-	files, err := ioutil.ReadDir(objectsDir)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-	}
-
-	file, err := findUniquePrefix(prefix, files)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-
-		// Try the packfile
-		obj, err := searchPacks(prefix, basedir)
-		if err != nil {
-			return nil, err
-		}
-		return obj.normalize(basedir)
-	}
-	f, err := os.Open(file.Name())
-	defer f.Close()
-	r, err := zlib.NewReader(f)
-	if err != nil {
-		return nil, err
-	}
-	return parseObj(r, prefix, basedir)
-
 }
 
 func findUniquePrefix(prefix SHA, files []os.FileInfo) (os.FileInfo, error) {

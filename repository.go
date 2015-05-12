@@ -14,11 +14,13 @@ type Repository struct {
 
 func (r *Repository) Object(input SHA) (obj GitObject, err error) {
 	err = r.normalizeBasename()
-	packfiles, err := listPackfiles(r.Basedir)
-	if err != nil {
-		return nil, err
+	if r.packfiles == nil {
+		packfiles, err := r.listPackfiles()
+		if err != nil {
+			return nil, err
+		}
+		r.packfiles = packfiles
 	}
-	r.packfiles = packfiles
 	basedir := r.Basedir
 	if path.Base(basedir) != ".git" {
 		basedir = path.Join(basedir, ".git")

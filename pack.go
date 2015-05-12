@@ -193,15 +193,8 @@ const (
 	OBJ_REF_DELTA
 )
 
-func searchPacks(object SHA, basedir string) (*packObject, error) {
-	packs, err := listPackfiles(basedir)
-	if err != nil {
-		return nil, err
-	}
-	return objInPacks(packs, object, basedir)
-}
-
-func listPackfiles(basedir string) ([]*packfile, error) {
+func (r *Repository) listPackfiles() ([]*packfile, error) {
+	basedir := r.Basedir
 	files, err := ioutil.ReadDir(path.Join(basedir, "objects", "pack"))
 	if err != nil {
 		return nil, err
@@ -217,37 +210,12 @@ func listPackfiles(basedir string) ([]*packfile, error) {
 	}
 	packs := make([]*packfile, len(packfileNames))
 	for i, n := range packfileNames {
-		packs[i] = &packfile{basedir: basedir, name: n}
+		p := &packfile{basedir: basedir, name: n}
+		err = p.verify()
+		if err != nil {
+			return nil, err
+		}
+		packs[i] = p
 	}
 	return packs, nil
-}
-
-func objInPacks(packs []*packfile, object SHA, basedir string) (*packObject, error) {
-	for _, pack := range packs {
-		if p, ok := pack.objects[object]; ok {
-			return p, nil
-		}
-		pf, err := os.Open(path.Join(basedir, "objects", "pack", string(pack.name)+".pack"))
-		if err != nil {
-			return nil, err
-		}
-		defer pf.Close()
-		inf, err := os.Open(path.Join(basedir, "objects", "pack", string(pack.name)+".idx"))
-		if err != nil {
-			return nil, err
-		}
-		defer inf.Close()
-
-		err = pack.verify()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, obj := range pack.objects {
-			if strings.HasPrefix(string(obj.Name), string(object)) {
-				return obj, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("object not in any packfiles: %s", object)
 }

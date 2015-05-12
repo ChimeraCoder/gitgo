@@ -6,12 +6,17 @@ import (
 )
 
 func Log(name SHA, basedir string) ([]Commit, error) {
-	as, err := allAncestors(name, basedir)
+	repo := Repository{Basedir: basedir}
+	err := repo.normalizeBasename()
+	if err != nil {
+		return nil, err
+	}
+	as, err := repo.allAncestors(name)
 	if err != nil {
 		return nil, err
 	}
 
-	obj, err := NewObject(name, basedir)
+	obj, err := repo.Object(name)
 	if err != nil {
 		return nil, fmt.Errorf("commit not found: %s", err)
 	}
@@ -23,8 +28,9 @@ func Log(name SHA, basedir string) ([]Commit, error) {
 	return result, nil
 }
 
-func allAncestors(name SHA, basedir string) ([]Commit, error) {
-	obj, err := NewObject(name, basedir)
+func (r *Repository) allAncestors(name SHA) ([]Commit, error) {
+	basedir := r.Basedir
+	obj, err := r.Object(name)
 	if err != nil {
 		return nil, fmt.Errorf("commit not found: %s", err)
 	}
@@ -46,7 +52,7 @@ func allAncestors(name SHA, basedir string) ([]Commit, error) {
 	parents := []Commit{}
 	if len(commit.Parents) > 0 {
 		// By default, git-log uses the first parent in merges
-		obj, err := NewObject(commit.Parents[0], basedir)
+		obj, err := r.Object(commit.Parents[0])
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +63,7 @@ func allAncestors(name SHA, basedir string) ([]Commit, error) {
 		}
 
 		parents = append(parents, parent)
-		ancestors, err := allAncestors(SHA(commit.Parents[0]), basedir)
+		ancestors, err := r.allAncestors(SHA(commit.Parents[0]))
 		if err != nil {
 			return parents, err
 		}
