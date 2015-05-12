@@ -97,6 +97,11 @@ type objectMeta struct {
 }
 
 func NewObject(input SHA, basedir string) (obj GitObject, err error) {
+	repo := Repository{Basedir: basedir}
+	return repo.Object(input)
+}
+
+func newObject(input SHA, basedir string, packfiles []*packfile) (obj GitObject, err error) {
 	if path.Base(basedir) != ".git" {
 		basedir = path.Join(basedir, ".git")
 	}
@@ -153,6 +158,12 @@ func NewObject(input SHA, basedir string) (obj GitObject, err error) {
 		}
 
 		// try the packfile
+		for _, pack := range packfiles {
+			if p, ok := pack.objects[input]; ok {
+				return p.normalize(basedir)
+			}
+		}
+
 		obj, err := searchPacks(input, basedir)
 		if err != nil {
 			return nil, err

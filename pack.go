@@ -10,6 +10,36 @@ import (
 	"strings"
 )
 
+type packfile struct {
+	basedir string
+	name    SHA
+	objects map[SHA]*packObject
+}
+
+func (p *packfile) verify() error {
+	if p.objects == nil {
+		p.objects = map[SHA]*packObject{}
+	}
+	packf, err := os.Open(path.Join(p.basedir, "objects", "pack", string(p.name)+".pack"))
+	if err != nil {
+		return err
+	}
+	defer packf.Close()
+	idxf, err := os.Open(path.Join(p.basedir, "objects", "pack", string(p.name)+".idx"))
+	if err != nil {
+		return err
+	}
+	defer idxf.Close()
+	objs, err := VerifyPack(packf, idxf)
+	if err != nil {
+		return err
+	}
+	for _, obj := range objs {
+		p.objects[obj.Name] = obj
+	}
+	return nil
+}
+
 type packObject struct {
 	Name        SHA
 	Offset      int
@@ -171,7 +201,7 @@ func searchPacks(object SHA, basedir string) (*packObject, error) {
 	return objInPacks(packs, object, basedir)
 }
 
-func listPackfiles(basedir string) ([]SHA, error) {
+func listPackfiles(basedir string) ([]*packfile, error) {
 	files, err := ioutil.ReadDir(path.Join(basedir, "objects", "pack"))
 	if err != nil {
 		return nil, err
@@ -185,28 +215,35 @@ func listPackfiles(basedir string) ([]SHA, error) {
 		}
 		packfileNames = append(packfileNames, SHA(base))
 	}
-	return packfileNames, nil
+	packs := make([]*packfile, len(packfileNames))
+	for i, n := range packfileNames {
+		packs[i] = &packfile{basedir: basedir, name: n}
+	}
+	return packs, nil
 }
 
-func objInPacks(packs []SHA, object SHA, basedir string) (*packObject, error) {
-	for _, name := range packs {
-		pf, err := os.Open(path.Join(basedir, "objects", "pack", string(name)+".pack"))
+func objInPacks(packs []*packfile, object SHA, basedir string) (*packObject, error) {
+	for _, pack := range packs {
+		if p, ok := pack.objects[object]; ok {
+			return p, nil
+		}
+		pf, err := os.Open(path.Join(basedir, "objects", "pack", string(pack.name)+".pack"))
 		if err != nil {
 			return nil, err
 		}
 		defer pf.Close()
-		inf, err := os.Open(path.Join(basedir, "objects", "pack", string(name)+".idx"))
+		inf, err := os.Open(path.Join(basedir, "objects", "pack", string(pack.name)+".idx"))
 		if err != nil {
 			return nil, err
 		}
 		defer inf.Close()
 
-		objs, err := VerifyPack(pf, inf)
+		err = pack.verify()
 		if err != nil {
 			return nil, err
 		}
 
-		for _, obj := range objs {
+		for _, obj := range pack.objects {
 			if strings.HasPrefix(string(obj.Name), string(object)) {
 				return obj, nil
 			}
