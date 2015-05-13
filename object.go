@@ -15,6 +15,43 @@ import (
 	"time"
 )
 
+type scanner struct {
+	r    io.Reader
+	data []byte
+	err  error
+}
+
+func (s *scanner) scan() bool {
+	if s.err != nil {
+		return false
+	}
+	s.data = s.read()
+	return s.err == nil
+}
+
+func (s *scanner) Err() error {
+	if s.err == io.EOF {
+		return nil
+	}
+	return s.err
+}
+
+func (s *scanner) read() []byte {
+	if s.err != nil {
+		return nil
+	}
+	result := make([]byte, 1)
+	n, err := s.r.Read(result)
+	if err != nil {
+		s.err = err
+		return nil
+	}
+	if n == 0 {
+		s.err = fmt.Errorf("read zero bytes")
+	}
+	return result
+}
+
 const (
 	RFC2822 = "Mon Jan 2 15:04:05 2006 -0700"
 )
@@ -206,27 +243,37 @@ func normalizePerms(perms string) string {
 }
 
 func parseObj(r io.Reader, name SHA, basedir string) (result GitObject, err error) {
-	// TODO fixme
-	bts, err := ioutil.ReadAll(r)
-	if err != nil {
-		return result, err
-	}
-	obj := bts
 
-	parts := bytes.Split(obj, []byte("\x00"))
-	parts = bytes.Fields(parts[0])
-	resultType := string(parts[0])
-	resultSize := string(parts[1])
-	nullIndex := bytes.Index(obj, []byte("\x00"))
+	var resultType string
+	var resultSize string
+	scnr := scanner{r, nil, nil}
+	for scnr.scan() {
+		txt := string(scnr.data)
+		if txt == " " {
+			break
+		}
+		resultType += txt
+	}
+
+	for scnr.scan() {
+		txt := string(scnr.data)
+		if txt == "\x00" {
+			break
+		}
+		resultSize += txt
+	}
+
+	if scnr.Err() != nil {
+		return nil, scnr.Err()
+	}
 
 	switch resultType {
 	case "commit":
-		return parseCommit(bytes.NewReader(obj[nullIndex+1:]), resultSize, name)
+		return parseCommit(r, resultSize, name)
 	case "tree":
-		return parseTree(bytes.NewReader(obj), resultSize, basedir)
-
+		return parseTree(r, resultSize, basedir)
 	case "blob":
-		return parseBlob(bytes.NewReader(obj[nullIndex+1:]), resultSize)
+		return parseBlob(r, resultSize)
 	default:
 		err = fmt.Errorf("Received unknown object type %s", resultType)
 	}
@@ -317,11 +364,6 @@ func parseTree(r io.Reader, resultSize string, basedir string) (Tree, error) {
 
 		if count == 0 {
 			// the first time through, scanner.Text() will be
-			// "tree <size>"
-			continue
-		}
-		if count == 1 {
-			// the second time through, scanner.Text() will be
 			// <perms> <filename>
 			// separated by a space
 			fields := strings.Fields(txt)
@@ -330,7 +372,7 @@ func parseTree(r io.Reader, resultSize string, basedir string) (Tree, error) {
 			continue
 		}
 
-		// after the second time through, scanner.Text() will be
+		// after the first time through, scanner.Text() will be
 		// <sha><perms2> <file2>
 		// where perms2 and file2 refer to the permissions and filename (respectively)
 		// of the NEXT object, and <sha> is the first 20 bytes exactly.
