@@ -299,20 +299,46 @@ func ScanNullLines(data []byte, atEOF bool) (advance int, token []byte, err erro
 	return 0, nil, nil
 }
 
+// ScanLinesNoTrim is exactly like bufio.ScanLines, except it does not trim the newline
+func ScanLinesNoTrim(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexByte(data, '\n'); i >= 0 {
+		// We have a full newline-terminated line.
+		return i + 1, data[0 : i+1], nil
+	}
+	// If we're at EOF, we have a final, non-terminated line. Return it.
+	if atEOF {
+		return len(data), data, nil
+	}
+	// Request more data.
+	return 0, nil, nil
+}
+
 func parseCommit(r io.Reader, resultSize string, name SHA) (Commit, error) {
 	var commit = Commit{_type: "commit", size: resultSize}
-	bts, err := ioutil.ReadAll(r)
-	if err != nil {
-		return commit, err
-	}
-	lines := bytes.Split(bts, []byte("\n"))
-	for i, line := range lines {
-		// The next line is the commit message
-		if len(bytes.Fields(line)) == 0 {
-			commit.Message = bytes.Join(lines[i+1:], []byte("\n"))
-			break
+
+	scnr := bufio.NewScanner(r)
+	scnr.Split(ScanLinesNoTrim)
+
+	var commitMessageLines [][]byte
+	for scnr.Scan() {
+		line := scnr.Bytes()
+		trimmedLine := bytes.TrimRight(line, "\r\n")
+		if commitMessageLines == nil && len(bytes.Fields(trimmedLine)) == 0 {
+			// Everything after the first empty line is the commit message
+			commitMessageLines = [][]byte{}
+			continue
 		}
-		parts := bytes.Fields(line)
+
+		if commitMessageLines != nil {
+			// We have already seen an empty line
+			commitMessageLines = append(commitMessageLines, line)
+			continue
+		}
+
+		parts := bytes.Fields(trimmedLine)
 		key := parts[0]
 		switch keyType(key) {
 		case treeKey:
@@ -336,11 +362,12 @@ func parseCommit(r io.Reader, resultSize string, name SHA) (Commit, error) {
 			commit.Committer = committer
 			commit.CommitterDate = date
 		default:
-			err = fmt.Errorf("encountered unknown field in commit: %s", key)
+			err := fmt.Errorf("encountered unknown field in commit: %s", key)
 			return commit, err
 		}
 	}
 	commit.Name = name
+	commit.Message = bytes.Join(commitMessageLines, []byte("\n"))
 	return commit, nil
 }
 
