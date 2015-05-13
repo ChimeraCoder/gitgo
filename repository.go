@@ -26,9 +26,6 @@ func (r *Repository) Object(input SHA) (obj GitObject, err error) {
 		basedir = path.Join(basedir, ".git")
 	}
 	obj, err = newObject(input, basedir, r.packfiles)
-	if err != nil {
-		panic(err)
-	}
 	return obj, err
 }
 
@@ -58,9 +55,6 @@ func (r *Repository) normalizeBasename() error {
 			return fmt.Errorf("not a git repository (or any parent up to root /")
 		}
 		candidate, err = filepath.Abs(path.Join(candidate, "..", "..", ".git"))
-		if err != nil {
-			panic(err)
-		}
 	}
 	return nil
 }
