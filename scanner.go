@@ -1,6 +1,7 @@
 package gitgo
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 )
