@@ -65,14 +65,14 @@ func patchDelta(start io.ReadSeeker, delta io.Reader) (io.Reader, error) {
 			var numBytes uint
 
 			if (b & 16) > 0 {
-				numBytes = numBytes | uint(uint(deltar.readByte(true)))
+				numBytes = numBytes | uint(uint(deltar.readByte()))
 			}
 			if (b & 32) > 0 {
-				numBytes = numBytes | uint((uint(deltar.readByte(true)) << 8))
+				numBytes = numBytes | uint((uint(deltar.readByte()) << 8))
 			}
 
 			if (b & 64) > 0 {
-				numBytes = numBytes | uint((uint(deltar.readByte(true)) << 16))
+				numBytes = numBytes | uint((uint(deltar.readByte()) << 16))
 			}
 
 			// Default to 0x10000 due to overflow
@@ -201,7 +201,7 @@ func (er *errReader) read(buf []byte) int {
 }
 
 // Like read(), but expect a single byte
-func (er *errReader) readByte(p ...bool) byte {
+func (er *errReader) readByte() byte {
 	b := make([]byte, 1)
 	n := er.read(b)
 	if n != 1 && er.err != nil {
