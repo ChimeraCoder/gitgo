@@ -23,6 +23,10 @@ func main() {
 		io.Copy(os.Stdout, result)
 
 	case "log":
+		if len(args) < 3 {
+			fmt.Println("must specify commit name with `log`")
+			os.Exit(1)
+		}
 		hash := gitgo.SHA(args[2])
 		commits, err := gitgo.Log(hash, "")
 		if err != nil {
