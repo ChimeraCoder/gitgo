@@ -12,9 +12,17 @@ import (
 
 func main() {
 	args := os.Args
+	if len(args) <= 2 {
+		fmt.Println("gitgo: must provide either cat-file or log subcommand")
+		return
+	}
 	module := args[1]
 	switch module {
 	case "cat-file":
+		if len(args) < 3 {
+			fmt.Println("must specify hash with `cat-file`")
+			os.Exit(1)
+		}
 		hash := args[2]
 		result, err := gitgo.CatFile(gitgo.SHA(hash))
 		if err != nil {
