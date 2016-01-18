@@ -69,3 +69,43 @@ func (r *Repository) normalizeBasename() error {
 	}
 	return nil
 }
+
+// findGitDir is like normalizeBasename but does not require
+// a repository with a valid file descriptor to operate on.
+// If pwd is non-nil, it will use the provided file. Otherwise,
+// it will default to the current working directory.
+func findGitDir(pwd *os.File) (dir *os.File, err error) {
+	if pwd == nil {
+		pwd, err = os.Open(".")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	candidate := pwd
+	candidateName := candidate.Name()
+	if filepath.Base(candidateName) != ".git" {
+		candidateName = path.Join(candidateName, ".git")
+	}
+	for {
+		candidate, err = os.Open(candidateName)
+		if err == nil {
+			return candidate, nil
+			break
+		}
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+
+		// This should not be the main condition of the for loop
+		// just in case the filesystem root directory contains
+		// a .git subdirectory
+		// TODO check for mountpoint
+		if candidateName == "/.git" {
+			return nil, fmt.Errorf("not a git repository (or any parent up to root /")
+		}
+		candidateName, err = filepath.Abs(path.Join(candidateName, "..", "..", ".git"))
+		candidate.Close()
+	}
+	return nil, fmt.Errorf("could not find the git repository")
+}

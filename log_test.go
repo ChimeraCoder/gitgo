@@ -8,7 +8,7 @@ import (
 func Test_Log(t *testing.T) {
 	const input SHA = "1d833eb5b6c5369c0cb7a4a3e20ded237490145f"
 	expected := []SHA{"1d833eb5b6c5369c0cb7a4a3e20ded237490145f", "a7f92c920ce85f07a33f948aa4fa2548b270024f", "97eed02ebe122df8fdd853c1215d8775f3d9f1a1"}
-	parents, err := Log(input, RepoDir.Name())
+	parents, err := Log(input, RepoDir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -33,7 +33,7 @@ func Test_Log(t *testing.T) {
 // due to the system-specific nature of the test
 func Test_SlowLog(t *testing.T) {
 	const input SHA = "a3dda0b50b190caf79ea5074ed6490f30ea47cef"
-	_, err := Log(input, "")
+	_, err := Log(input, nil)
 	if err != nil {
 		t.Skip("Failed to read %s: %s", input, err)
 	}
