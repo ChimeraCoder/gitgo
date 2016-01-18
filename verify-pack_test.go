@@ -34,14 +34,14 @@ chain length = 2: 1 object
 
 `
 
-	packFile, err := os.Open(path.Join(RepoDir, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.pack"))
+	packFile, err := os.Open(path.Join(RepoDir.Name(), "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.pack"))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer packFile.Close()
 
-	idxFile, err := os.Open(path.Join(RepoDir, "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx"))
+	idxFile, err := os.Open(path.Join(RepoDir.Name(), "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx"))
 	if err != nil {
 		t.Error(err)
 		return

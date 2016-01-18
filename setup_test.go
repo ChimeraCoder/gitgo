@@ -6,7 +6,7 @@ import (
 	"path"
 )
 
-var RepoDir = path.Join("test_data", ".git")
+var RepoDir *os.File
 
 func init() {
 
@@ -20,4 +20,13 @@ func init() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func init() {
+	var err error
+	RepoDir, err = os.Open(path.Join("test_data", ".git"))
+	if err != nil {
+		panic(err)
+	}
+
 }

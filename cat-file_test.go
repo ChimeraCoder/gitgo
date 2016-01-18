@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"reflect"
 	"strings"
@@ -64,7 +65,12 @@ committer aditya <dev@chimeracoder.net> 1428075900 -0400
 
 First commit. Create .gitignore`
 
-	result, err := parseObj(strings.NewReader(input), inputSHA, "")
+	pwd, err := os.Open(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := parseObj(strings.NewReader(input), inputSHA, *pwd)
 	if err != nil {
 		t.Error(err)
 		return
@@ -96,7 +102,12 @@ func Test_parseObjTreeCommit(t *testing.T) {
 		size:          "243",
 	}
 
-	result, err := parseObj(strings.NewReader(fileContents), inputSHA, "")
+	pwd, err := os.Open(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := parseObj(strings.NewReader(fileContents), inputSHA, *pwd)
 	if err != nil {
 		t.Error(err)
 		return
@@ -121,7 +132,7 @@ func Test_ParseTree(t *testing.T) {
 			objectMeta{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
 		},
 	}
-	result, err := NewObject(inputSha, RepoDir)
+	result, err := NewObject(inputSha, *RepoDir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -138,7 +149,7 @@ func Test_ParseBlob(t *testing.T) {
 		size:     "18",
 		Contents: []byte("*.swp\n*.swo\n*.swn\n"),
 	}
-	result, err := NewObject(inputSha, RepoDir)
+	result, err := NewObject(inputSha, *RepoDir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -152,7 +163,7 @@ func Test_ParsePackfile(t *testing.T) {
 	const inputSha = SHA("c3b8133617bbdb72e237b0f163fade7fbf1f0c18")
 	const expected = 2160
 
-	result, err := NewObject(inputSha, RepoDir)
+	result, err := NewObject(inputSha, *RepoDir)
 	if err != nil {
 		t.Error(err)
 		return
@@ -178,7 +189,7 @@ func Test_ParsePrefix(t *testing.T) {
 			objectMeta{SHA("d564d0bc3dd917926892c55e3706cc116d5b165e"), "040000", "examples"},
 		},
 	}
-	result, err := NewObject(inputSha[:15], RepoDir)
+	result, err := NewObject(inputSha[:15], *RepoDir)
 	if err != nil {
 		t.Error(err)
 		return
@@ -191,7 +202,7 @@ func Test_ParsePrefix(t *testing.T) {
 func Test_ParsePrefixPackfile(t *testing.T) {
 	// in the test directory, this is stored in a packfile
 	const inputSHA SHA = "b45377f6daf59a4cec9e8de64f5df1533a7994cd"
-	_, err := NewObject(inputSHA[:15], RepoDir)
+	_, err := NewObject(inputSHA[:15], *RepoDir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -201,9 +212,13 @@ func Test_NakedDirectory(t *testing.T) {
 	// Test that we can read a "naked" directory
 	// (ie, without the .git extension)
 
-	dir := path.Clean(path.Join(RepoDir, ".."))
+	dirName := path.Clean(path.Join(RepoDir.Name(), ".."))
+	dir, err := os.Open(dirName)
+	if err != nil {
+		t.Fatal(err)
+	}
 	const inputSHA SHA = "254671773e8cd91e07e36546c9a2d9c27e8dfeec"
-	_, err := NewObject(inputSHA[:15], dir)
+	_, err = NewObject(inputSHA[:15], *dir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -212,9 +227,13 @@ func Test_NakedDirectory(t *testing.T) {
 func Test_Subdirectory(t *testing.T) {
 	// Test that we can read a subdirectory of a git repo
 
-	dir := path.Clean(path.Join(RepoDir, "..", "subdir"))
+	dirName := path.Clean(path.Join(RepoDir.Name(), "..", "subdir"))
+	dir, err := os.Open(dirName)
+	if err != nil {
+		t.Fatal(err)
+	}
 	const inputSHA SHA = "254671773e8cd91e07e36546c9a2d9c27e8dfeec"
-	_, err := NewObject(inputSHA[:15], dir)
+	_, err = NewObject(inputSHA[:15], *dir)
 	if err != nil {
 		t.Error(err)
 	}

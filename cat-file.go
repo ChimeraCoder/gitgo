@@ -3,6 +3,7 @@ package gitgo
 import (
 	"bytes"
 	"io"
+	"os"
 )
 
 type keyType string
@@ -20,7 +21,11 @@ const (
 // CatFile implements git cat-file for the command-line
 // tool. Currently it supports only the -t fiag
 func CatFile(name SHA) (io.Reader, error) {
-	obj, err := NewObject(name, "")
+	pwd, err := os.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	obj, err := NewObject(name, *pwd)
 	if err != nil {
 		return nil, err
 	}

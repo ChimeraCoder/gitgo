@@ -8,7 +8,7 @@ import (
 )
 
 type Repository struct {
-	Basedir   string
+	Basedir   os.File
 	packfiles []*packfile
 }
 
@@ -21,26 +21,36 @@ func (r *Repository) Object(input SHA) (obj GitObject, err error) {
 		}
 		r.packfiles = packfiles
 	}
-	basedir := r.Basedir
-	if path.Base(basedir) != ".git" {
-		basedir = path.Join(basedir, ".git")
+	basedir := &r.Basedir
+	if path.Base(basedir.Name()) != ".git" {
+		basedirName := basedir.Name()
+		basedir.Close()
+		basedir, err = os.Open(path.Join(basedirName, ".git"))
+		if err != nil {
+			return nil, err
+		}
 	}
 	obj, err = newObject(input, basedir, r.packfiles)
 	return obj, err
 }
 
 func (r *Repository) normalizeBasename() error {
-	candidate := r.Basedir
-	if candidate == "" {
-		candidate = "."
+	var err error
+	candidate := &r.Basedir
+	if candidate.Name() == "" {
+		candidate, err = os.Open(".")
+		if err != nil {
+			return err
+		}
 	}
-	if filepath.Base(candidate) != ".git" {
-		candidate = path.Join(candidate, ".git")
+	candidateName := candidate.Name()
+	if filepath.Base(candidateName) != ".git" {
+		candidateName = path.Join(candidateName, ".git")
 	}
 	for {
-		_, err := os.Stat(candidate)
+		candidate, err = os.Open(candidateName)
 		if err == nil {
-			r.Basedir = candidate
+			r.Basedir = *candidate
 			break
 		}
 		if !os.IsNotExist(err) {
@@ -51,10 +61,11 @@ func (r *Repository) normalizeBasename() error {
 		// just in case the filesystem root directory contains
 		// a .git subdirectory
 		// TODO check for mountpoint
-		if candidate == "/.git" {
+		if candidateName == "/.git" {
 			return fmt.Errorf("not a git repository (or any parent up to root /")
 		}
-		candidate, err = filepath.Abs(path.Join(candidate, "..", "..", ".git"))
+		candidateName, err = filepath.Abs(path.Join(candidateName, "..", "..", ".git"))
+		candidate.Close()
 	}
 	return nil
 }

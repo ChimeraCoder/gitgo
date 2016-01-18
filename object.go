@@ -96,19 +96,24 @@ type objectMeta struct {
 	filename string
 }
 
-func NewObject(input SHA, basedir string) (obj GitObject, err error) {
+func NewObject(input SHA, basedir os.File) (obj GitObject, err error) {
 	repo := Repository{Basedir: basedir}
 	return repo.Object(input)
 }
 
-func newObject(input SHA, basedir string, packfiles []*packfile) (obj GitObject, err error) {
-	if path.Base(basedir) != ".git" {
-		basedir = path.Join(basedir, ".git")
+func newObject(input SHA, basedir *os.File, packfiles []*packfile) (obj GitObject, err error) {
+
+	if path.Base(basedir.Name()) != ".git" {
+		defer basedir.Close()
+		basedir, err = os.Open(path.Join(basedir.Name(), ".git"))
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	candidate := basedir
+	candidateName := basedir.Name()
 	for {
-		_, err := os.Stat(candidate)
+		candidate, err := os.Open(candidateName)
 		if err == nil {
 			basedir = candidate
 			break
@@ -121,17 +126,17 @@ func newObject(input SHA, basedir string, packfiles []*packfile) (obj GitObject,
 		// just in case the filesystem root directory contains
 		// a .git subdirectory
 		// TODO check for mountpoint
-		if candidate == "/" {
+		if candidateName == "/" {
 			return nil, fmt.Errorf("not a git repository (or any parent up to root /")
 		}
-		candidate = path.Join(candidate, "..", "..", ".git")
+		candidateName = path.Join(candidate.Name(), "..", "..", ".git")
 	}
 
 	if len(input) < 4 {
 		return nil, fmt.Errorf("input SHA must be at least 4 characters")
 	}
 
-	filename := path.Join(basedir, "objects", string(input[:2]), string(input[2:]))
+	filename := path.Join(basedir.Name(), "objects", string(input[:2]), string(input[2:]))
 	_, err = os.Stat(filename)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -139,20 +144,20 @@ func newObject(input SHA, basedir string, packfiles []*packfile) (obj GitObject,
 		}
 
 		// check the directory for a file with the SHA as a prefix
-		_, err = os.Stat(path.Join(basedir, "objects", string(input[:2])))
+		_, err = os.Stat(path.Join(basedir.Name(), "objects", string(input[:2])))
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return nil, err
 			}
 		} else {
-			dirname := path.Join(basedir, "objects", string(input[:2]))
+			dirname := path.Join(basedir.Name(), "objects", string(input[:2]))
 			files, err := ioutil.ReadDir(dirname)
 			if err != nil {
 				return nil, err
 			}
 			for _, file := range files {
 				if strings.HasPrefix(file.Name(), string(input[2:])) {
-					return objectFromFile(path.Join(dirname, file.Name()), input, basedir)
+					return objectFromFile(path.Join(dirname, file.Name()), input, *basedir)
 				}
 			}
 		}
@@ -160,11 +165,11 @@ func newObject(input SHA, basedir string, packfiles []*packfile) (obj GitObject,
 		// try the packfile
 		for _, pack := range packfiles {
 			if p, ok := pack.objects[input]; ok {
-				return p.normalize(basedir)
+				return p.normalize(*basedir)
 			}
 			for _, object := range pack.objects {
 				if strings.HasPrefix(string(object.Name), string(input)) {
-					return object.normalize(basedir)
+					return object.normalize(*basedir)
 				}
 			}
 		}
@@ -180,11 +185,11 @@ func newObject(input SHA, basedir string, packfiles []*packfile) (obj GitObject,
 	if err != nil {
 		return nil, err
 	}
-	return parseObj(r, input, basedir)
+	return parseObj(r, input, *basedir)
 
 }
 
-func objectFromFile(filename string, name SHA, basedir string) (GitObject, error) {
+func objectFromFile(filename string, name SHA, basedir os.File) (GitObject, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -205,7 +210,7 @@ func normalizePerms(perms string) string {
 	return perms
 }
 
-func parseObj(r io.Reader, name SHA, basedir string) (result GitObject, err error) {
+func parseObj(r io.Reader, name SHA, basedir os.File) (result GitObject, err error) {
 
 	var resultType string
 	var resultSize string
@@ -299,7 +304,7 @@ func parseCommit(r io.Reader, resultSize string, name SHA) (Commit, error) {
 	return commit, nil
 }
 
-func parseTree(r io.Reader, resultSize string, basedir string) (Tree, error) {
+func parseTree(r io.Reader, resultSize string, basedir os.File) (Tree, error) {
 	var tree = Tree{_type: "tree", size: resultSize}
 
 	scanner := bufio.NewScanner(r)

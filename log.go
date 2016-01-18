@@ -2,12 +2,18 @@ package gitgo
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 )
 
-func Log(name SHA, basedir string) ([]Commit, error) {
-	repo := Repository{Basedir: basedir}
-	err := repo.normalizeBasename()
+func Log(name SHA, basedirName string) ([]Commit, error) {
+	f, err := os.Open(basedirName)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	repo := Repository{Basedir: *f}
+	err = repo.normalizeBasename()
 	if err != nil {
 		return nil, err
 	}

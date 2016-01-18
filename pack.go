@@ -11,7 +11,7 @@ import (
 )
 
 type packfile struct {
-	basedir string
+	basedir os.File
 	name    SHA
 	objects map[SHA]*packObject
 }
@@ -20,12 +20,12 @@ func (p *packfile) verify() error {
 	if p.objects == nil {
 		p.objects = map[SHA]*packObject{}
 	}
-	packf, err := os.Open(path.Join(p.basedir, "objects", "pack", string(p.name)+".pack"))
+	packf, err := os.Open(path.Join(p.basedir.Name(), "objects", "pack", string(p.name)+".pack"))
 	if err != nil {
 		return err
 	}
 	defer packf.Close()
-	idxf, err := os.Open(path.Join(p.basedir, "objects", "pack", string(p.name)+".idx"))
+	idxf, err := os.Open(path.Join(p.basedir.Name(), "objects", "pack", string(p.name)+".idx"))
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (p *packObject) Type() string {
 // packObject satisfies the GitObject interface, but if the pack
 // object type is a commit, tree, or blob, it will return a Commit,
 // Tree, or Blob struct instead of the packObject
-func (p *packObject) normalize(basedir string) (GitObject, error) {
+func (p *packObject) normalize(basedir os.File) (GitObject, error) {
 	switch p.BaseObjectType {
 	case OBJ_COMMIT:
 		return p.Commit(basedir)
@@ -92,7 +92,7 @@ func (p *packObject) normalize(basedir string) (GitObject, error) {
 }
 
 // Commit returns a Commit struct for the packObject.
-func (p *packObject) Commit(basedir string) (Commit, error) {
+func (p *packObject) Commit(basedir os.File) (Commit, error) {
 	if p.BaseObjectType != OBJ_COMMIT {
 		return Commit{}, fmt.Errorf("pack object is not a commit: %s", p.Type())
 	}
@@ -106,7 +106,7 @@ func (p *packObject) Commit(basedir string) (Commit, error) {
 }
 
 // Tree returns a Tree struct for the packObject.
-func (p *packObject) Tree(basedir string) (Tree, error) {
+func (p *packObject) Tree(basedir os.File) (Tree, error) {
 	if p.BaseObjectType != OBJ_TREE {
 		return Tree{}, fmt.Errorf("pack object is not a tree: %s", p.Type())
 	}
@@ -119,7 +119,7 @@ func (p *packObject) Tree(basedir string) (Tree, error) {
 }
 
 // Blob returns a Blob struct for the packObject.
-func (p *packObject) Blob(basedir string) (Blob, error) {
+func (p *packObject) Blob(basedir os.File) (Blob, error) {
 	if p.BaseObjectType != OBJ_BLOB {
 		return Blob{}, fmt.Errorf("pack object is not a blob: %s", p.Type())
 	}
@@ -127,7 +127,8 @@ func (p *packObject) Blob(basedir string) (Blob, error) {
 		p.PatchedData = p.Data
 	}
 
-	blob, err := parseBlob(bytes.NewReader(p.PatchedData), basedir)
+	// TODO fix the size param
+	blob, err := parseBlob(bytes.NewReader(p.PatchedData), "")
 	blob.rawData = p.PatchedData
 	return blob, err
 }
@@ -195,7 +196,7 @@ const (
 
 func (r *Repository) listPackfiles() ([]*packfile, error) {
 	basedir := r.Basedir
-	files, err := ioutil.ReadDir(path.Join(basedir, "objects", "pack"))
+	files, err := ioutil.ReadDir(path.Join(basedir.Name(), "objects", "pack"))
 	if err != nil {
 		return nil, err
 	}
