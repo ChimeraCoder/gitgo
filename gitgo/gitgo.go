@@ -36,7 +36,7 @@ func main() {
 			os.Exit(1)
 		}
 		hash := gitgo.SHA(args[2])
-		commits, err := gitgo.Log(hash, "")
+		commits, err := gitgo.Log(hash, nil)
 		if err != nil {
 			log.Fatal(err)
 		}

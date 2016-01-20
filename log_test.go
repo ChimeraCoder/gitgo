@@ -33,7 +33,7 @@ func Test_Log(t *testing.T) {
 // due to the system-specific nature of the test
 func Test_SlowLog(t *testing.T) {
 	const input SHA = "a3dda0b50b190caf79ea5074ed6490f30ea47cef"
-	_, err := Log(input, "")
+	_, err := Log(input, nil)
 	if err != nil {
 		t.Skip("Failed to read %s: %s", input, err)
 	}

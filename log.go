@@ -2,15 +2,21 @@ package gitgo
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 )
 
-func Log(name SHA, basedir string) ([]Commit, error) {
-	repo := Repository{Basedir: basedir}
-	err := repo.normalizeBasename()
+// Log is equivalent to `git log <SHA>`. If basedir is non-nil
+// and points to a valid git respository, the command will be run
+// using that repository.
+func Log(name SHA, basedir *os.File) ([]Commit, error) {
+	dir, err := findGitDir(basedir)
 	if err != nil {
 		return nil, err
 	}
+	defer dir.Close()
+
+	repo := Repository{Basedir: *dir}
 	as, err := repo.allAncestors(name)
 	if err != nil {
 		return nil, err
