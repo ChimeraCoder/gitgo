@@ -9,7 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -103,9 +103,9 @@ func NewObject(input SHA, basedir os.File) (obj GitObject, err error) {
 
 func newObject(input SHA, basedir *os.File, packfiles []*packfile) (obj GitObject, err error) {
 
-	if path.Base(basedir.Name()) != ".git" {
+	if filepath.Base(basedir.Name()) != ".git" {
 		defer basedir.Close()
-		basedir, err = os.Open(path.Join(basedir.Name(), ".git"))
+		basedir, err = os.Open(filepath.Join(basedir.Name(), ".git"))
 		if err != nil {
 			return nil, err
 		}
@@ -129,14 +129,14 @@ func newObject(input SHA, basedir *os.File, packfiles []*packfile) (obj GitObjec
 		if candidateName == "/" {
 			return nil, fmt.Errorf("not a git repository (or any parent up to root /")
 		}
-		candidateName = path.Join(candidate.Name(), "..", "..", ".git")
+		candidateName = filepath.Join(candidate.Name(), "..", "..", ".git")
 	}
 
 	if len(input) < 4 {
 		return nil, fmt.Errorf("input SHA must be at least 4 characters")
 	}
 
-	filename := path.Join(basedir.Name(), "objects", string(input[:2]), string(input[2:]))
+	filename := filepath.Join(basedir.Name(), "objects", string(input[:2]), string(input[2:]))
 	_, err = os.Stat(filename)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -144,20 +144,20 @@ func newObject(input SHA, basedir *os.File, packfiles []*packfile) (obj GitObjec
 		}
 
 		// check the directory for a file with the SHA as a prefix
-		_, err = os.Stat(path.Join(basedir.Name(), "objects", string(input[:2])))
+		_, err = os.Stat(filepath.Join(basedir.Name(), "objects", string(input[:2])))
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return nil, err
 			}
 		} else {
-			dirname := path.Join(basedir.Name(), "objects", string(input[:2]))
+			dirname := filepath.Join(basedir.Name(), "objects", string(input[:2]))
 			files, err := ioutil.ReadDir(dirname)
 			if err != nil {
 				return nil, err
 			}
 			for _, file := range files {
 				if strings.HasPrefix(file.Name(), string(input[2:])) {
-					return objectFromFile(path.Join(dirname, file.Name()), input, *basedir)
+					return objectFromFile(filepath.Join(dirname, file.Name()), input, *basedir)
 				}
 			}
 		}

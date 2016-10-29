@@ -5,7 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -212,7 +212,7 @@ func Test_NakedDirectory(t *testing.T) {
 	// Test that we can read a "naked" directory
 	// (ie, without the .git extension)
 
-	dirName := path.Clean(path.Join(RepoDir.Name(), ".."))
+	dirName := filepath.Clean(filepath.Join(RepoDir.Name(), ".."))
 	dir, err := os.Open(dirName)
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func Test_NakedDirectory(t *testing.T) {
 func Test_Subdirectory(t *testing.T) {
 	// Test that we can read a subdirectory of a git repo
 
-	dirName := path.Clean(path.Join(RepoDir.Name(), "..", "subdir"))
+	dirName := filepath.Clean(filepath.Join(RepoDir.Name(), "..", "subdir"))
 	dir, err := os.Open(dirName)
 	if err != nil {
 		t.Fatal(err)
