@@ -3,7 +3,6 @@ package gitgo
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -22,10 +21,10 @@ func (r *Repository) Object(input SHA) (obj GitObject, err error) {
 		r.packfiles = packfiles
 	}
 	basedir := &r.Basedir
-	if path.Base(basedir.Name()) != ".git" {
+	if filepath.Base(basedir.Name()) != ".git" {
 		basedirName := basedir.Name()
 		basedir.Close()
-		basedir, err = os.Open(path.Join(basedirName, ".git"))
+		basedir, err = os.Open(filepath.Join(basedirName, ".git"))
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +44,7 @@ func (r *Repository) normalizeBasename() error {
 	}
 	candidateName := candidate.Name()
 	if filepath.Base(candidateName) != ".git" {
-		candidateName = path.Join(candidateName, ".git")
+		candidateName = filepath.Join(candidateName, ".git")
 	}
 	for {
 		candidate, err = os.Open(candidateName)
@@ -64,7 +63,7 @@ func (r *Repository) normalizeBasename() error {
 		if candidateName == "/.git" {
 			return fmt.Errorf("not a git repository (or any parent up to root /")
 		}
-		candidateName, err = filepath.Abs(path.Join(candidateName, "..", "..", ".git"))
+		candidateName, err = filepath.Abs(filepath.Join(candidateName, "..", "..", ".git"))
 		candidate.Close()
 	}
 	return nil
@@ -85,7 +84,7 @@ func findGitDir(pwd *os.File) (dir *os.File, err error) {
 	candidate := pwd
 	candidateName := candidate.Name()
 	if filepath.Base(candidateName) != ".git" {
-		candidateName = path.Join(candidateName, ".git")
+		candidateName = filepath.Join(candidateName, ".git")
 	}
 	for {
 		candidate, err = os.Open(candidateName)
@@ -104,7 +103,7 @@ func findGitDir(pwd *os.File) (dir *os.File, err error) {
 		if candidateName == "/.git" {
 			return nil, fmt.Errorf("not a git repository (or any parent up to root /")
 		}
-		candidateName, err = filepath.Abs(path.Join(candidateName, "..", "..", ".git"))
+		candidateName, err = filepath.Abs(filepath.Join(candidateName, "..", "..", ".git"))
 		candidate.Close()
 	}
 	return nil, fmt.Errorf("could not find the git repository")

@@ -1,0 +1,5 @@
+environment:
+    GOPATH: c:\gopath
+
+build_script:
+    - go test -v

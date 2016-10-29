@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -20,12 +20,12 @@ func (p *packfile) verify() error {
 	if p.objects == nil {
 		p.objects = map[SHA]*packObject{}
 	}
-	packf, err := os.Open(path.Join(p.basedir.Name(), "objects", "pack", string(p.name)+".pack"))
+	packf, err := os.Open(filepath.Join(p.basedir.Name(), "objects", "pack", string(p.name)+".pack"))
 	if err != nil {
 		return err
 	}
 	defer packf.Close()
-	idxf, err := os.Open(path.Join(p.basedir.Name(), "objects", "pack", string(p.name)+".idx"))
+	idxf, err := os.Open(filepath.Join(p.basedir.Name(), "objects", "pack", string(p.name)+".idx"))
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ const (
 
 func (r *Repository) listPackfiles() ([]*packfile, error) {
 	basedir := r.Basedir
-	files, err := ioutil.ReadDir(path.Join(basedir.Name(), "objects", "pack"))
+	files, err := ioutil.ReadDir(filepath.Join(basedir.Name(), "objects", "pack"))
 	if err != nil {
 		return nil, err
 	}
