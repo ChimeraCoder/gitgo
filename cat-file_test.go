@@ -1,6 +1,7 @@
 package gitgo
 
 import (
+	"compress/zlib"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -236,5 +237,48 @@ func Test_Subdirectory(t *testing.T) {
 	_, err = NewObject(inputSHA[:15], *dir)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+// BenchmarkCatFile benchmarks the entire CatFile operation,
+// including opening the current directory and searching for the location
+// of the closest parent git repository
+func BenchmarkCatFile(b *testing.B) {
+	const inputSha = SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67")
+	for i := 0; i < b.N; i++ {
+		_, _ = CatFile(inputSha) //, *RepoDir)
+	}
+}
+
+// BenchmarkParseObject benchmarks the operation that reads a compressed object file
+// and parses it into a blob GitObject. The benchmark includes the zlib inflate operation.
+// It uses an object that is not stored within a packfile.
+func BenchmarkParseObject(b *testing.B) {
+	const inputSha = SHA("af6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67")
+	basedir, err := os.Open(filepath.Join("test_data", ".git"))
+	if err != nil {
+		b.Error(err)
+	}
+	defer basedir.Close()
+	f, err := os.Open(filepath.Join("test_data", ".git", "objects", "af", "6e4fe91a8f9a0f3c03cbec9e1d2aac47345d67"))
+	if err != nil {
+		b.Error(err)
+	}
+	defer f.Close()
+
+	for i := 0; i < b.N; i++ {
+		f.Seek(0, io.SeekStart)
+		r, err := zlib.NewReader(f)
+		if err != nil {
+			b.Fatalf("error on iteration %d: %s", i, err)
+		}
+		obj, err := parseObj(r, inputSha, *basedir)
+		if err != nil {
+			b.Fatalf("error on iteration %d: %s", i, err)
+		}
+		blb := obj.(Blob)
+		if blb.size != "18" {
+			b.Errorf("Expected size 18 and found size %d", blb.size)
+		}
 	}
 }
