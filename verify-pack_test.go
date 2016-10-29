@@ -1,6 +1,7 @@
 package gitgo
 
 import (
+	"io"
 	"log"
 	"os"
 	"path"
@@ -127,5 +128,28 @@ chain length = 2: 1 object
 			t.Errorf("Expected and result don't match:\n%+v\n%+v", expected, result)
 		}
 	*/
+}
 
+func BenchmarkVerifyPack(b *testing.B) {
+	packFile, err := os.Open(path.Join(RepoDir.Name(), "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.pack"))
+	if err != nil {
+		b.Error(err)
+		return
+	}
+	defer packFile.Close()
+
+	idxFile, err := os.Open(path.Join(RepoDir.Name(), "objects/pack/pack-d310969c4ba0ebfe725685fa577a1eec5ecb15b2.idx"))
+	if err != nil {
+		return
+	}
+
+	defer idxFile.Close()
+	for i := 0; i < b.N; i++ {
+		_, err := VerifyPack(packFile, idxFile)
+		if err != nil {
+			b.Errorf("error in iteration %d: %s", i, err)
+		}
+		packFile.Seek(0, io.SeekStart)
+		idxFile.Seek(0, io.SeekStart)
+	}
 }

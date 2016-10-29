@@ -90,7 +90,6 @@ func findGitDir(pwd *os.File) (dir *os.File, err error) {
 		candidate, err = os.Open(candidateName)
 		if err == nil {
 			return candidate, nil
-			break
 		}
 		if !os.IsNotExist(err) {
 			return nil, err
