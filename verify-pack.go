@@ -210,15 +210,15 @@ func parsePackV2(r errReadSeeker, objects []*packObject) ([]*packObject, error) 
 				sevenBytes := uint(_byte) & 127
 
 				offset = (offset << 7) + int(sevenBytes)
-
+				
+				if nbytes >= 2 {
+					offset += (1 << (7 * (nbytes - 1)))
+				}
+				
 				MSB = int(_byte & 128)
 				if MSB == 0 {
 					break
 				}
-			}
-
-			if nbytes >= 2 {
-				offset += (1 << (7 * (nbytes - 1)))
 			}
 
 			object.negativeOffset = offset
